@@ -39,6 +39,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Validate status if provided
+  const VALID_STATUSES = ["generated", "accepted", "rejected", "sent", "saved"];
+  if (status && !VALID_STATUSES.includes(status)) {
+    return NextResponse.json(
+      { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
   // Build update payload
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),

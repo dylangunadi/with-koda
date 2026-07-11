@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicApiKey } from "@/lib/env";
 import { MOVE_GENERATOR_SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
-import type { Profile, MoveType } from "@/lib/types";
+import type { Profile, MoveType, AgentContext } from "@/lib/types";
 
 export interface GeneratedMove {
   title: string;
@@ -13,6 +13,7 @@ export interface GeneratedMove {
   outreach_draft: string;
   proof_of_work_idea: string;
   follow_up_timing: string;
+  source_note: string;
   confidence: number;
 }
 
@@ -38,7 +39,8 @@ function isValidMove(move: unknown): move is GeneratedMove {
     typeof m.follow_up_timing === "string" &&
     typeof m.confidence === "number" &&
     m.confidence >= 0 &&
-    m.confidence <= 1
+    m.confidence <= 1 &&
+    typeof m.source_note === "string"
   );
 }
 
@@ -55,6 +57,7 @@ function sanitizeMove(move: Record<string, unknown>): GeneratedMove {
     outreach_draft: String(move.outreach_draft || ""),
     proof_of_work_idea: String(move.proof_of_work_idea || ""),
     follow_up_timing: String(move.follow_up_timing || ""),
+    source_note: String(move.source_note || ""),
     confidence: Math.min(1, Math.max(0, Number(move.confidence) || 0.5)),
   };
 }
@@ -75,6 +78,7 @@ export function generateMockMoves(profile: Profile): GeneratedMove[] {
       outreach_draft: "",
       proof_of_work_idea: `Write a one-page analysis of ${company}'s latest product feature and how you would improve it, using your ${role} perspective.`,
       follow_up_timing: "Complete within 2 days",
+      source_note: "Starting with research on your top target company.",
       confidence: 0.85,
     },
     {
@@ -87,6 +91,7 @@ export function generateMockMoves(profile: Profile): GeneratedMove[] {
       outreach_draft: `Hi, I'm ${profile.name || "a student"} at ${profile.school || "university"} exploring ${role} roles. Your path into ${secondCompany} caught my eye because it seems closely aligned with what I'm building toward. Would you be open to a 15 minute chat sometime this week?`,
       proof_of_work_idea: "",
       follow_up_timing: "Send by end of this week",
+      source_note: "Networking with recent hires is a high-signal recruiting move.",
       confidence: 0.75,
     },
     {
@@ -99,17 +104,20 @@ export function generateMockMoves(profile: Profile): GeneratedMove[] {
       outreach_draft: "",
       proof_of_work_idea: `Create a short case study or prototype relevant to ${role}. For example, if targeting product roles, write a 1-page product tear-down. If targeting engineering, build a small tool or script that solves a real problem you've encountered.`,
       follow_up_timing: "Complete within 3 days",
+      source_note: "Proof-of-work artifacts give you something tangible to share in outreach.",
       confidence: 0.8,
     },
   ];
 }
 
 export async function generateRecruitingMoves(
-  profile: Profile
+  profile: Profile,
+  agentContext?: AgentContext
 ): Promise<GeneratedMove[]> {
   const apiKey = getAnthropicApiKey();
 
   if (!apiKey) {
+    console.warn("[koda:generateMoves] No ANTHROPIC_API_KEY — falling back to mock moves.");
     return generateMockMoves(profile);
   }
 
@@ -119,7 +127,7 @@ export async function generateRecruitingMoves(
     model: "claude-sonnet-4-5",
     max_tokens: 2000,
     system: MOVE_GENERATOR_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildUserPrompt(profile) }],
+    messages: [{ role: "user", content: buildUserPrompt(profile, agentContext) }],
   });
 
   const raw =
@@ -134,6 +142,7 @@ export async function generateRecruitingMoves(
     const moves: unknown[] = Array.isArray(parsed) ? parsed : [];
 
     if (moves.length === 0) {
+      console.warn("[koda:generateMoves] LLM returned empty moves array — falling back to mock moves.");
       return generateMockMoves(profile);
     }
 
@@ -144,6 +153,7 @@ export async function generateRecruitingMoves(
       return sanitizeMove(move as Record<string, unknown>);
     });
   } catch {
+    console.warn("[koda:generateMoves] Failed to parse LLM response — falling back to mock moves.");
     return generateMockMoves(profile);
   }
 }

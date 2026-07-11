@@ -47,6 +47,9 @@ export default function SettingsPage() {
     linkedin_url: "",
     semester_goal: "",
     contacts_notes: "",
+    autonomous_enabled: false,
+    brief_frequency: "daily",
+    brief_email: "",
   })
 
   useEffect(() => {
@@ -81,6 +84,9 @@ export default function SettingsPage() {
           linkedin_url: data.linkedin_url ?? "",
           semester_goal: data.semester_goal ?? "",
           contacts_notes: data.contacts_notes ?? "",
+          autonomous_enabled: data.autonomous_enabled ?? false,
+          brief_frequency: data.brief_frequency ?? "daily",
+          brief_email: data.brief_email ?? "",
         })
       }
 
@@ -90,7 +96,7 @@ export default function SettingsPage() {
     loadProfile()
   }, [router])
 
-  function update(field: string, value: string) {
+  function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
     setSuccess(false)
   }
@@ -316,6 +322,73 @@ export default function SettingsPage() {
               />
               <p className="text-xs text-muted-foreground">Optional</p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Autonomous Briefs */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Autonomous Briefs</CardTitle>
+            <CardDescription>
+              Let Koda generate and email you recruiting moves on a schedule
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="autonomous_enabled">Enable Autonomous Briefs</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Koda will generate moves and email you a digest
+                </p>
+              </div>
+              <button
+                id="autonomous_enabled"
+                role="switch"
+                aria-checked={form.autonomous_enabled}
+                onClick={() => update("autonomous_enabled", !form.autonomous_enabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  form.autonomous_enabled ? "bg-primary" : "bg-muted"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    form.autonomous_enabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+            {form.autonomous_enabled && (
+              <>
+                <div className="space-y-2">
+                  <Label>Frequency</Label>
+                  <Select
+                    value={form.brief_frequency}
+                    onValueChange={(val) => update("brief_frequency", val ?? "daily")}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly (Monday)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="brief_email">Brief Email</Label>
+                  <Input
+                    id="brief_email"
+                    type="email"
+                    placeholder="you@school.edu"
+                    value={form.brief_email}
+                    onChange={(e) => update("brief_email", e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Where to send your autonomous brief digest
+                  </p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

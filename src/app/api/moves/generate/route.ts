@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateRecruitingMoves } from "@/lib/koda/generateRecruitingMoves";
+import { buildAgentContext } from "@/lib/koda/agentContext";
 import type { Profile } from "@/lib/types";
 
 export async function POST() {
@@ -28,7 +29,9 @@ export async function POST() {
     );
   }
 
-  const moves = await generateRecruitingMoves(profile as Profile);
+  // Build agent context from prior moves and feedback
+  const agentContext = await buildAgentContext(supabase, user.id);
+  const moves = await generateRecruitingMoves(profile as Profile, agentContext);
 
   // Insert moves into recruiting_moves table
   const movesToInsert = moves.map((move) => ({
@@ -42,6 +45,7 @@ export async function POST() {
     outreach_draft: move.outreach_draft,
     proof_of_work_idea: move.proof_of_work_idea,
     follow_up_timing: move.follow_up_timing,
+    source_note: move.source_note,
     confidence: move.confidence,
     status: "generated" as const,
   }));

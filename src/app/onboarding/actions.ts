@@ -15,6 +15,9 @@ interface ProfileFormData {
   linkedin_url: string
   semester_goal: string
   contacts_notes: string
+  autonomous_enabled?: boolean
+  brief_frequency?: string
+  brief_email?: string
 }
 
 function splitCommas(value: string): string[] {
@@ -50,6 +53,9 @@ export async function saveProfile(data: ProfileFormData) {
     linkedin_url: data.linkedin_url || null,
     semester_goal: data.semester_goal || null,
     contacts_notes: data.contacts_notes || null,
+    autonomous_enabled: data.autonomous_enabled ?? false,
+    brief_frequency: ["daily", "weekly"].includes(data.brief_frequency || "") ? data.brief_frequency : "daily",
+    brief_email: data.brief_email || null,
     updated_at: new Date().toISOString(),
   }
 
