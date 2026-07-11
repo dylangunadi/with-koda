@@ -72,7 +72,7 @@ export function WaitlistForm() {
           placeholder="you@school.edu"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1"
+          className="mt-1 h-11 rounded-lg"
         />
       </div>
 
@@ -83,7 +83,7 @@ export function WaitlistForm() {
           placeholder="Your name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1"
+          className="mt-1 h-11 rounded-lg"
         />
       </div>
 
@@ -95,7 +95,7 @@ export function WaitlistForm() {
             placeholder="UC Berkeley"
             value={school}
             onChange={(e) => setSchool(e.target.value)}
-            className="mt-1"
+            className="mt-1 h-11 rounded-lg"
           />
         </div>
         <div>
@@ -104,7 +104,7 @@ export function WaitlistForm() {
             id="classYear"
             value={classYear}
             onChange={(e) => setClassYear(e.target.value)}
-            className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="mt-1 flex h-11 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="">Select</option>
             <option value="Freshman">Freshman</option>
@@ -123,7 +123,7 @@ export function WaitlistForm() {
           placeholder="PM, SWE, startup roles..."
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="mt-1"
+          className="mt-1 h-11 rounded-lg"
         />
       </div>
 
@@ -131,7 +131,7 @@ export function WaitlistForm() {
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      <Button type="submit" disabled={loading} className="w-full">
+      <Button type="submit" disabled={loading} className="w-full h-11 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity">
         {loading ? "Joining..." : "Join the waitlist"}
       </Button>
     </form>

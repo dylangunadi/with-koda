@@ -21,28 +21,24 @@ const STEPS = [
     label: "step 01",
     slug: "about you",
     description: "Let's start with the basics",
-    tagline: "Every great career starts with knowing yourself.",
   },
   {
     title: "Targets",
     label: "step 02",
     slug: "your targets",
     description: "What are you aiming for?",
-    tagline: "Clarity on where you want to go changes everything.",
   },
   {
     title: "Background",
     label: "step 03",
     slug: "your background",
     description: "Help us understand your experience",
-    tagline: "What you've done shapes what Koda finds for you.",
   },
   {
     title: "Goals",
     label: "step 04",
     slug: "your goals",
     description: "What does success look like?",
-    tagline: "The sharper the goal, the sharper the moves.",
   },
 ]
 
@@ -124,6 +120,7 @@ export default function OnboardingPage() {
                       onClick={() => {
                         if (i < step) setStep(i)
                       }}
+                      aria-label={`Step ${i + 1}: ${s.title}${i < step ? " (completed)" : i === step ? " (current)" : ""}`}
                       className={`flex flex-col items-center gap-1.5 group ${
                         i < step ? "cursor-pointer" : "cursor-default"
                       }`}
@@ -202,12 +199,9 @@ export default function OnboardingPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {STEPS[step].description}
               </p>
-              <p className="mt-3 text-sm italic text-primary/70 leading-relaxed">
-                &ldquo;{STEPS[step].tagline}&rdquo;
-              </p>
             </div>
 
-            <div className="px-6 pt-4 pb-2 sm:px-8 space-y-5">
+            <div className="px-6 pt-4 pb-4 sm:px-8 space-y-5">
               {step === 0 && (
                 <>
                   <div className="space-y-2">

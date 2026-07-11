@@ -28,7 +28,11 @@ export function GenerateMovesButton() {
   }
 
   return (
-    <Button onClick={handleGenerate} disabled={loading} size="lg">
+    <Button
+      onClick={handleGenerate}
+      disabled={loading}
+      className="h-11 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity run-glow"
+    >
       {loading ? (
         <Loader2 className="size-4 animate-spin" />
       ) : (

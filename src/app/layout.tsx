@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
+import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           {children}
+          <Analytics />
           <Toaster position="bottom-right" />
         </ThemeProvider>
       </body>

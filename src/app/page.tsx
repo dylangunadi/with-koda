@@ -27,58 +27,88 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 pt-20 pb-16 sm:pt-28 sm:pb-24">
-        <div className="grid gap-16 lg:grid-cols-[1fr,auto] lg:items-center">
-          {/* Left: Copy */}
-          <div className="max-w-xl">
-            <p className="font-system text-primary mb-4 page-enter" style={{ animationDelay: "0ms" }}>
-              Opportunity agent for student builders
+      {/* Hero — centered, no awkward 2-col split */}
+      <section className="relative z-10 mx-auto max-w-6xl px-6 pt-20 pb-12 sm:pt-28 sm:pb-16">
+        <div className="max-w-2xl page-enter" style={{ animationDelay: "0ms" }}>
+          <p className="font-system text-primary mb-4">
+            Opportunity agent for student builders
+          </p>
+          <h1
+            className="text-4xl sm:text-5xl lg:text-[3.4rem] font-heading font-bold leading-[1.1] tracking-tight text-foreground page-enter"
+            style={{ animationDelay: "60ms" }}
+          >
+            The right opportunity.
+            <br />
+            The right person.
+            <br />
+            <span className="text-primary">The right thing to send.</span>
+          </h1>
+          <p
+            className="mt-6 text-lg leading-relaxed text-muted-foreground max-w-lg page-enter"
+            style={{ animationDelay: "120ms" }}
+          >
+            Koda watches the landscape, learns what you care about, and
+            surfaces 3 moves you can execute today — people to reach,
+            things to build, drafts to send.
+          </p>
+          <div
+            className="mt-8 flex flex-wrap items-center gap-4 page-enter"
+            style={{ animationDelay: "180ms" }}
+          >
+            <a
+              href="#waitlist"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Get early access
+              <ArrowRight className="size-4" />
+            </a>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              I have an account
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Briefing card showcase — centered, not crammed into a grid column */}
+      <section className="relative z-10 mx-auto max-w-6xl px-6 pb-16 sm:pb-24">
+        <p className="font-system text-primary mb-4 lg:hidden page-enter" style={{ animationDelay: "240ms" }}>
+          Your daily brief
+        </p>
+        <div
+          className="grid gap-6 lg:grid-cols-[1fr_1fr_1fr] page-enter"
+          style={{ animationDelay: "300ms" }}
+        >
+          {/* Left context */}
+          <div className="hidden lg:flex flex-col justify-center pr-4">
+            <p className="font-system text-primary mb-3">Your daily brief</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Every morning, Koda analyzes your profile, your feedback history,
+              and the current landscape to generate 3 moves tailored to you.
             </p>
-            <h1
-              className="text-4xl sm:text-5xl lg:text-[3.4rem] font-heading font-bold leading-[1.1] tracking-tight text-foreground page-enter"
-              style={{ animationDelay: "60ms" }}
-            >
-              The right opportunity.
-              <br />
-              The right person.
-              <br />
-              <span className="text-primary">The right thing to send.</span>
-            </h1>
-            <p
-              className="mt-6 text-lg leading-relaxed text-muted-foreground max-w-md page-enter"
-              style={{ animationDelay: "120ms" }}
-            >
-              Koda watches the landscape, learns what you care about, and
-              surfaces 3 moves you can execute today — people to reach,
-              things to build, drafts to send.
+            <p className="text-sm text-muted-foreground leading-relaxed mt-3">
+              Each move explains <span className="text-foreground font-medium">why</span> it
+              matters for your specific recruiting goals.
             </p>
-            <div
-              className="mt-8 flex flex-wrap items-center gap-4 page-enter"
-              style={{ animationDelay: "180ms" }}
-            >
-              <a
-                href="#waitlist"
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Get early access
-                <ArrowRight className="size-4" />
-              </a>
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-              >
-                I have an account
-              </Link>
-            </div>
           </div>
 
-          {/* Right: Mock Briefing Card */}
-          <div
-            className="relative w-full max-w-sm page-enter"
-            style={{ animationDelay: "300ms" }}
-          >
+          {/* Center card */}
+          <div className="lg:col-span-1">
             <MockBriefingCard />
+          </div>
+
+          {/* Right context */}
+          <div className="hidden lg:flex flex-col justify-center pl-4">
+            <p className="font-system text-primary mb-3">You decide</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Accept, reject, edit, send. Every action teaches Koda what
+              resonates with you and what doesn&apos;t.
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-3">
+              Your next brief is always sharper than the last.
+            </p>
           </div>
         </div>
       </section>
@@ -87,12 +117,12 @@ export default function Home() {
       <section className="relative z-10 border-y border-border/40 bg-secondary/30">
         <div className="mx-auto max-w-6xl px-6 py-5">
           <p className="font-system text-muted-foreground text-center">
-            Built by students at Berkeley · For students recruiting into tech, startups, PM, and AI
+            Built by students at Berkeley &middot; For students recruiting into tech, startups, PM, and AI
           </p>
         </div>
       </section>
 
-      {/* What Koda does — show, don't tell */}
+      {/* How it works */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 py-20 sm:py-28">
         <div className="max-w-2xl mb-14">
           <p className="font-system text-primary mb-3">How it works</p>
@@ -133,7 +163,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <MoveTypeCard type="Person to Contact" example="A PM at a Series B fintech who went to your school" color="bg-blue-500/10 text-blue-700 dark:text-blue-400" />
             <MoveTypeCard type="Proof of Work" example="Write a 1-page teardown of their latest feature launch" color="bg-purple-500/10 text-purple-700 dark:text-purple-400" />
             <MoveTypeCard type="Outreach Draft" example="A warm, specific message referencing your shared background" color="bg-amber-500/10 text-amber-700 dark:text-amber-400" />
@@ -170,7 +200,7 @@ export default function Home() {
             <span className="font-heading font-semibold text-sm text-foreground">Koda</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} · Built for students who recruit differently
+            &copy; {new Date().getFullYear()} &middot; Built for students who recruit differently
           </p>
         </div>
       </footer>
@@ -180,12 +210,12 @@ export default function Home() {
 
 function MockBriefingCard() {
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-lg overflow-hidden">
+    <div className="rounded-2xl border border-border bg-card shadow-lg overflow-hidden move-card">
       {/* Card header */}
       <div className="border-b border-border/60 px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="status-dot" />
-          <span className="font-system text-muted-foreground">Koda brief · today</span>
+          <span className="font-system text-muted-foreground">Koda brief &middot; today</span>
         </div>
         <span className="font-system text-primary">3 moves</span>
       </div>
@@ -212,11 +242,24 @@ function MockBriefingCard() {
         />
       </div>
 
-      {/* Footer */}
-      <div className="px-5 py-3 bg-secondary/30 border-t border-border/40">
-        <p className="font-system text-muted-foreground text-center">
-          ↑ This is what your inbox looks like
-        </p>
+      {/* Footer — mock action bar */}
+      <div className="px-5 py-2.5 bg-secondary/30 border-t border-border/40 flex items-center gap-3">
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          Accept
+        </span>
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400">
+          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          Pass
+        </span>
+        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+          Save
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-blue-500">
+          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+          Send
+        </span>
       </div>
     </div>
   );

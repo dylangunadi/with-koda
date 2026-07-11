@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [confirmationSent, setConfirmationSent] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -36,13 +37,20 @@ export default function LoginPage() {
       }
       router.push("/inbox")
     } else {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
       })
       if (error) {
         setError(error.message)
         setLoading(false)
+        return
+      }
+      // If email confirmation is required, user won't have a session yet
+      if (data.user && !data.session) {
+        setError(null)
+        setLoading(false)
+        setConfirmationSent(true)
         return
       }
       router.push("/onboarding")
@@ -87,8 +95,37 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {/* Email confirmation message */}
+          {confirmationSent && (
+            <div
+              className="rounded-2xl border border-primary/20 bg-accent p-8 text-center page-enter"
+              style={{ animationDelay: "120ms" }}
+            >
+              <div className="flex justify-center mb-4">
+                <div className="status-dot" />
+              </div>
+              <p className="text-lg font-heading font-semibold text-foreground">
+                Check your email
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
+                Click it to activate your account, then come back and sign in.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmationSent(false)
+                  setMode("signin")
+                }}
+                className="mt-4 text-sm font-medium text-primary hover:underline"
+              >
+                Back to sign in
+              </button>
+            </div>
+          )}
+
           {/* Card */}
-          <div
+          {!confirmationSent && <div
             className="rounded-2xl border border-border bg-card shadow-sm p-8 page-enter"
             style={{ animationDelay: "120ms" }}
           >
@@ -195,7 +232,7 @@ export default function LoginPage() {
                 </Button>
               </div>
             </form>
-          </div>
+          </div>}
 
           {/* Footer tagline */}
           <div

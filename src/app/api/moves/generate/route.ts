@@ -30,8 +30,17 @@ export async function POST() {
   }
 
   // Build agent context from prior moves and feedback
-  const agentContext = await buildAgentContext(supabase, user.id);
-  const moves = await generateRecruitingMoves(profile as Profile, agentContext);
+  let moves;
+  try {
+    const agentContext = await buildAgentContext(supabase, user.id);
+    moves = await generateRecruitingMoves(profile as Profile, agentContext);
+  } catch (err) {
+    console.error("Move generation failed:", err);
+    return NextResponse.json(
+      { error: "Failed to generate moves. Please try again." },
+      { status: 500 }
+    );
+  }
 
   // Insert moves into recruiting_moves table
   const movesToInsert = moves.map((move) => ({
