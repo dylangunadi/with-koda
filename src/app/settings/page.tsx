@@ -2,19 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -115,46 +107,32 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push("/login")
-  }
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <p className="text-muted-foreground text-sm">Loading profile...</p>
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="status-dot" />
+        <p className="font-system text-muted-foreground">Loading profile</p>
       </div>
     )
   }
 
   return (
     <div className="page-enter">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-heading font-semibold tracking-tight">
-            Settings
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Update your recruiting profile
-          </p>
-        </div>
-        <Link href="/inbox">
-          <Button variant="outline" size="sm">
-            Back to Inbox
-          </Button>
-        </Link>
+      <div className="mb-10">
+        <p className="font-system text-primary mb-2">Profile settings</p>
+        <h1 className="text-2xl font-heading font-bold tracking-tight text-foreground">
+          Your Recruiting Profile
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Keep this updated so Koda generates better moves for you.
+        </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* About You */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">About You</CardTitle>
-            <CardDescription>Your basic information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="page-enter" style={{ animationDelay: "60ms" }}>
+          <p className="font-system text-primary mb-3">About you</p>
+          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -162,6 +140,7 @@ export default function SettingsPage() {
                 placeholder="Your full name"
                 value={form.name}
                 onChange={(e) => update("name", e.target.value)}
+                className="h-11 rounded-lg"
               />
             </div>
             <div className="space-y-2">
@@ -171,6 +150,7 @@ export default function SettingsPage() {
                 placeholder="Your university"
                 value={form.school}
                 onChange={(e) => update("school", e.target.value)}
+                className="h-11 rounded-lg"
               />
             </div>
             <div className="space-y-2">
@@ -179,7 +159,7 @@ export default function SettingsPage() {
                 value={form.year}
                 onValueChange={(val) => update("year", val ?? "")}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full h-11 rounded-lg">
                   <SelectValue placeholder="Select your year" />
                 </SelectTrigger>
                 <SelectContent>
@@ -191,16 +171,13 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Targets */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Targets</CardTitle>
-            <CardDescription>What are you aiming for?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="page-enter" style={{ animationDelay: "120ms" }}>
+          <p className="font-system text-primary mb-3">Targets</p>
+          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="target_roles">Target Roles</Label>
               <Input
@@ -208,6 +185,7 @@ export default function SettingsPage() {
                 placeholder="PM, SWE, startup ops..."
                 value={form.target_roles}
                 onChange={(e) => update("target_roles", e.target.value)}
+                className="h-11 rounded-lg"
               />
               <p className="text-xs text-muted-foreground">
                 Separate multiple roles with commas
@@ -220,6 +198,7 @@ export default function SettingsPage() {
                 placeholder="Google, Stripe, Notion..."
                 value={form.target_companies}
                 onChange={(e) => update("target_companies", e.target.value)}
+                className="h-11 rounded-lg"
               />
               <p className="text-xs text-muted-foreground">
                 Separate multiple companies with commas
@@ -232,6 +211,7 @@ export default function SettingsPage() {
                 placeholder="Tech, Finance, Healthcare..."
                 value={form.industries}
                 onChange={(e) => update("industries", e.target.value)}
+                className="h-11 rounded-lg"
               />
               <p className="text-xs text-muted-foreground">
                 Separate multiple industries with commas
@@ -244,23 +224,19 @@ export default function SettingsPage() {
                 placeholder="San Francisco, New York, Remote..."
                 value={form.locations}
                 onChange={(e) => update("locations", e.target.value)}
+                className="h-11 rounded-lg"
               />
               <p className="text-xs text-muted-foreground">
                 Separate multiple locations with commas
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Background */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Background</CardTitle>
-            <CardDescription>
-              Help us understand your experience
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="page-enter" style={{ animationDelay: "180ms" }}>
+          <p className="font-system text-primary mb-3">Background</p>
+          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="work_auth">Work Authorization</Label>
               <Input
@@ -268,6 +244,7 @@ export default function SettingsPage() {
                 placeholder="e.g. US Citizen, F-1 OPT, H-1B..."
                 value={form.work_auth}
                 onChange={(e) => update("work_auth", e.target.value)}
+                className="h-11 rounded-lg"
               />
               <p className="text-xs text-muted-foreground">Optional</p>
             </div>
@@ -279,6 +256,7 @@ export default function SettingsPage() {
                 value={form.resume_text}
                 onChange={(e) => update("resume_text", e.target.value)}
                 rows={6}
+                className="rounded-lg"
               />
             </div>
             <div className="space-y-2">
@@ -288,19 +266,17 @@ export default function SettingsPage() {
                 placeholder="https://linkedin.com/in/yourname"
                 value={form.linkedin_url}
                 onChange={(e) => update("linkedin_url", e.target.value)}
+                className="h-11 rounded-lg"
               />
               <p className="text-xs text-muted-foreground">Optional</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Goals */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Goals</CardTitle>
-            <CardDescription>What does success look like?</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="page-enter" style={{ animationDelay: "240ms" }}>
+          <p className="font-system text-primary mb-3">Goals</p>
+          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="semester_goal">Semester Goal</Label>
               <Textarea
@@ -309,6 +285,7 @@ export default function SettingsPage() {
                 value={form.semester_goal}
                 onChange={(e) => update("semester_goal", e.target.value)}
                 rows={4}
+                className="rounded-lg"
               />
             </div>
             <div className="space-y-2">
@@ -319,21 +296,17 @@ export default function SettingsPage() {
                 value={form.contacts_notes}
                 onChange={(e) => update("contacts_notes", e.target.value)}
                 rows={3}
+                className="rounded-lg"
               />
               <p className="text-xs text-muted-foreground">Optional</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Autonomous Briefs */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Autonomous Briefs</CardTitle>
-            <CardDescription>
-              Let Koda generate and email you recruiting moves on a schedule
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="page-enter" style={{ animationDelay: "300ms" }}>
+          <p className="font-system text-primary mb-3">Autonomous briefs</p>
+          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="autonomous_enabled">Enable Autonomous Briefs</Label>
@@ -346,7 +319,7 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={form.autonomous_enabled}
                 onClick={() => update("autonomous_enabled", !form.autonomous_enabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                   form.autonomous_enabled ? "bg-primary" : "bg-muted"
                 }`}
               >
@@ -358,14 +331,14 @@ export default function SettingsPage() {
               </button>
             </div>
             {form.autonomous_enabled && (
-              <>
+              <div className="space-y-4 border-t border-border/40 pt-4" style={{ animation: "fadeSlideIn 180ms ease-out" }}>
                 <div className="space-y-2">
                   <Label>Frequency</Label>
                   <Select
                     value={form.brief_frequency}
                     onValueChange={(val) => update("brief_frequency", val ?? "daily")}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full h-11 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -382,38 +355,38 @@ export default function SettingsPage() {
                     placeholder="you@school.edu"
                     value={form.brief_email}
                     onChange={(e) => update("brief_email", e.target.value)}
+                    className="h-11 rounded-lg"
                   />
                   <p className="text-xs text-muted-foreground">
                     Where to send your autonomous brief digest
                   </p>
                 </div>
-              </>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Actions */}
+        {/* Status messages */}
         {error && (
-          <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="rounded-md bg-primary/10 border border-primary/20 px-3 py-2 text-sm text-primary">
+          <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-3 text-sm text-primary flex items-center gap-2">
+            <div className="status-dot" />
             Profile saved successfully.
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        {/* Actions */}
+        <div className="flex items-center justify-end page-enter" style={{ animationDelay: "360ms" }}>
           <Button
-            variant="outline"
-            onClick={handleSignOut}
-            className="text-destructive hover:text-destructive"
+            onClick={handleSave}
+            disabled={saving}
+            className="h-11 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity px-8"
           >
-            Sign Out
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
