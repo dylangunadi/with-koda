@@ -98,7 +98,7 @@ export default function LoginPage() {
           {/* Email confirmation message */}
           {confirmationSent && (
             <div
-              className="rounded-2xl border border-primary/20 bg-accent p-8 text-center page-enter"
+              className="rounded-xl border border-primary/20 bg-accent p-8 text-center page-enter"
               style={{ animationDelay: "120ms" }}
             >
               <div className="flex justify-center mb-4">
@@ -126,7 +126,7 @@ export default function LoginPage() {
 
           {/* Card */}
           {!confirmationSent && <div
-            className="rounded-2xl border border-border bg-card shadow-sm p-8 page-enter"
+            className="rounded-xl border border-border bg-card shadow-sm p-8 page-enter"
             style={{ animationDelay: "120ms" }}
           >
             {/* Mode toggle */}

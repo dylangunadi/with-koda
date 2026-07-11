@@ -189,7 +189,7 @@ export default function OnboardingPage() {
           {/* Card */}
           <div
             key={step}
-            className="rounded-2xl border border-border bg-card shadow-sm page-enter"
+            className="rounded-xl border border-border bg-card shadow-sm page-enter"
             style={{ animationDelay: "120ms" }}
           >
             <div className="px-6 pt-6 pb-2 sm:px-8 sm:pt-8">

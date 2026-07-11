@@ -50,7 +50,7 @@ export function WaitlistForm() {
 
   if (success) {
     return (
-      <div className="rounded-2xl border border-primary/20 bg-accent p-8 text-center">
+      <div className="rounded-xl border border-primary/20 bg-accent p-8 text-center">
         <div className="flex justify-center mb-3">
           <div className="status-dot" />
         </div>

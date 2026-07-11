@@ -77,7 +77,7 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm move-card overflow-hidden">
+    <div className="rounded-xl border border-border bg-card shadow-sm move-card overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-3 sm:px-6">
         <div className="flex items-start justify-between gap-3">

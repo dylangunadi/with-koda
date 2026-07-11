@@ -132,7 +132,7 @@ export default function SettingsPage() {
         {/* About You */}
         <div className="page-enter" style={{ animationDelay: "60ms" }}>
           <p className="font-system text-primary mb-3">About you</p>
-          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input
@@ -177,7 +177,7 @@ export default function SettingsPage() {
         {/* Targets */}
         <div className="page-enter" style={{ animationDelay: "120ms" }}>
           <p className="font-system text-primary mb-3">Targets</p>
-          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="target_roles">Target Roles</Label>
               <Input
@@ -236,7 +236,7 @@ export default function SettingsPage() {
         {/* Background */}
         <div className="page-enter" style={{ animationDelay: "180ms" }}>
           <p className="font-system text-primary mb-3">Background</p>
-          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="work_auth">Work Authorization</Label>
               <Input
@@ -276,7 +276,7 @@ export default function SettingsPage() {
         {/* Goals */}
         <div className="page-enter" style={{ animationDelay: "240ms" }}>
           <p className="font-system text-primary mb-3">Goals</p>
-          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="semester_goal">Semester Goal</Label>
               <Textarea
@@ -306,7 +306,7 @@ export default function SettingsPage() {
         {/* Autonomous Briefs */}
         <div className="page-enter" style={{ animationDelay: "300ms" }}>
           <p className="font-system text-primary mb-3">Autonomous briefs</p>
-          <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-4">
+          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="autonomous_enabled">Enable Autonomous Briefs</Label>

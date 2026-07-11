@@ -222,7 +222,7 @@ export default function Home() {
               Built from 20+ student interviews
             </p>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+          <div className="rounded-xl border border-border bg-card p-6 sm:p-8">
             <WaitlistForm />
           </div>
         </div>
@@ -250,7 +250,7 @@ function HeroBriefMock() {
   return (
     <div className="relative">
       {/* Main brief card */}
-      <div className="rounded-2xl border border-border bg-card shadow-xl overflow-hidden move-card">
+      <div className="rounded-xl border border-border bg-card shadow-xl overflow-hidden move-card">
         {/* Window chrome */}
         <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/60 bg-secondary/50">
           <div className="size-[7px] rounded-full bg-border" />
@@ -371,7 +371,7 @@ function HeroBriefMock() {
 
 function ExpandedBriefMock() {
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden max-w-2xl mx-auto">
+    <div className="rounded-xl border border-border bg-card overflow-hidden max-w-2xl mx-auto">
       {/* Move header */}
       <div className="px-6 py-5 border-b border-border/40">
         <div className="flex items-center gap-2 mb-3">
@@ -479,7 +479,7 @@ function StepCard({
 }) {
   return (
     <div
-      className="group rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-colors page-enter"
+      className="group rounded-lg border border-border bg-card p-5 hover:border-primary/30 transition-colors page-enter"
       style={{ animationDelay: delay }}
     >
       <span className="font-system text-primary/40 group-hover:text-primary transition-colors">
@@ -501,7 +501,7 @@ function MoveTypeCard({
   color: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-2.5">
+    <div className="rounded-lg border border-border bg-card p-5 space-y-2.5">
       <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${color}`}>
         {type}
       </span>
