@@ -10,34 +10,33 @@ export default function Home() {
       <div className="grain fixed inset-0 pointer-events-none" />
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/40 bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+          <Link href="/" className="flex items-center gap-2.5">
             <div className="status-dot" />
-            <span className="text-xl font-heading font-bold tracking-tight text-foreground">
+            <span className="font-heading text-lg font-semibold tracking-tight text-foreground">
               Koda
             </span>
-          </div>
+          </Link>
           <Link
             href="/login"
-            className="group flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             Log in
-            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
           </Link>
         </div>
       </header>
 
-      {/* Hero — true 2-column with large product mock */}
+      {/* Hero */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pt-16 pb-10 sm:pt-20 sm:pb-14 lg:pt-24 lg:pb-16">
-        <div className="grid gap-10 lg:grid-cols-[1fr_1.15fr] lg:gap-14 items-center">
+        <div className="grid gap-10 lg:grid-cols-[1fr_1.15fr] lg:gap-16 items-center">
           {/* Left: copy */}
           <div className="page-enter" style={{ animationDelay: "0ms" }}>
             <p className="font-system text-primary mb-4">
-              Opportunity agent for student builders
+              Your recruiting agent
             </p>
             <h1
-              className="text-4xl sm:text-5xl lg:text-[3.2rem] font-heading font-bold leading-[1.08] tracking-tight text-foreground page-enter"
+              className="text-4xl sm:text-5xl lg:text-[3.2rem] font-heading font-semibold leading-[1.08] tracking-tight text-foreground page-enter"
               style={{ animationDelay: "60ms" }}
             >
               The right opportunity.
@@ -47,57 +46,56 @@ export default function Home() {
               <span className="text-primary">The right thing to send.</span>
             </h1>
             <p
-              className="mt-5 text-[15.5px] leading-[1.65] text-foreground/70 max-w-md page-enter"
+              className="mt-5 text-[15px] leading-[1.7] text-muted-foreground max-w-[26rem] page-enter"
               style={{ animationDelay: "120ms" }}
             >
-              Koda watches the landscape, learns what you care about, and
-              surfaces 3 moves you can execute today — people to reach,
-              things to build, drafts to send.
+              Tell Koda what you are aiming for. It prepares three concrete
+              moves: who to contact, what to send, and what to do next.
             </p>
             <div
-              className="mt-7 flex flex-wrap items-center gap-4 page-enter"
+              className="mt-7 flex flex-wrap items-center gap-3 page-enter"
               style={{ animationDelay: "180ms" }}
             >
               <a
                 href="#waitlist"
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
               >
                 Get early access
-                <ArrowRight className="size-4" aria-hidden="true" />
+                <ArrowRight className="size-3.5" aria-hidden="true" />
               </a>
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-secondary transition-colors"
               >
                 I have an account
               </Link>
             </div>
           </div>
 
-          {/* Right: large product mock */}
+          {/* Right: Koda Brief mock */}
           <div
             className="page-enter"
             style={{ animationDelay: "240ms" }}
           >
-            <HeroProductMock />
+            <HeroBriefMock />
           </div>
         </div>
       </section>
 
-      {/* Social proof line */}
-      <section className="relative z-10 border-y border-border/40 bg-secondary/30">
-        <div className="mx-auto max-w-6xl px-6 py-4">
-          <p className="font-system text-foreground/50 text-center">
-            Built by students at Berkeley &middot; For students recruiting into tech, startups, PM, and AI
+      {/* Trust row */}
+      <section className="relative z-10 border-y border-border/50">
+        <div className="mx-auto max-w-6xl px-6 py-3.5">
+          <p className="font-system text-muted-foreground text-center">
+            Built for students recruiting into tech, startups, product, and AI. You approve every send.
           </p>
         </div>
       </section>
 
-      {/* How it works — compact */}
+      {/* How it works */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 py-16 sm:py-20">
         <div className="max-w-xl mb-10">
           <p className="font-system text-primary mb-3">How it works</p>
-          <h2 className="text-3xl sm:text-[2.1rem] font-heading font-bold leading-tight text-foreground">
+          <h2 className="text-3xl sm:text-[2rem] font-heading font-semibold leading-tight text-foreground">
             Koda runs while you focus on building.
           </h2>
         </div>
@@ -105,71 +103,106 @@ export default function Home() {
         <div className="grid gap-5 sm:grid-cols-3">
           <StepCard
             number="01"
-            title="Teach Koda about you"
-            description="Your target roles, companies, and what you've built. Koda learns your recruiting DNA in 2 minutes."
+            title="Tell Koda what you want"
+            description="Add your target roles, companies, experience, and constraints."
             delay="0ms"
           />
           <StepCard
             number="02"
-            title="Get your daily brief"
-            description="3 moves, every day. A person to contact, a thing to build, a draft to send. Each one explains why it matters for you."
+            title="Wake up to your brief"
+            description="Koda prepares three moves worth acting on, with drafts and context already attached."
             delay="60ms"
           />
           <StepCard
             number="03"
-            title="Koda learns from you"
-            description="Accept, reject, edit. Every action teaches Koda your taste. Your next brief is sharper than the last."
+            title="Teach Koda your taste"
+            description="Accept, edit, save, or pass. Each choice improves the next brief."
             delay="120ms"
           />
         </div>
       </section>
 
-      {/* Product showcase — expanded move detail */}
-      <section className="relative z-10 border-t border-border/40 bg-secondary/20 py-16 sm:py-20">
+      {/* Path divider */}
+      <div className="relative z-10 mx-auto max-w-6xl px-6">
+        <div className="path-divider">
+          <div className="signal-node" />
+        </div>
+      </div>
+
+      {/* Inside your Koda Brief */}
+      <section className="relative z-10 py-16 sm:py-20">
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center mb-10">
-            <p className="font-system text-primary mb-3">Inside a move</p>
-            <h2 className="text-3xl sm:text-[2.1rem] font-heading font-bold leading-tight text-foreground">
-              Everything you need to act — nothing you don&apos;t.
+            <p className="font-system text-primary mb-3">Inside your Koda Brief</p>
+            <h2 className="text-3xl sm:text-[2rem] font-heading font-semibold leading-tight text-foreground">
+              Every move comes with the context you need to act.
             </h2>
           </div>
 
-          <ExpandedMoveMock />
+          <ExpandedBriefMock />
         </div>
       </section>
 
-      {/* Move types — 3x2 grid */}
+      {/* Path divider */}
+      <div className="relative z-10 mx-auto max-w-6xl px-6">
+        <div className="path-divider">
+          <div className="signal-node" />
+        </div>
+      </div>
+
+      {/* Move types */}
       <section className="relative z-10 py-16 sm:py-20">
         <div className="mx-auto max-w-6xl px-6">
           <div className="max-w-xl mb-10">
             <p className="font-system text-primary mb-3">Six move types</p>
-            <h2 className="text-3xl sm:text-[2.1rem] font-heading font-bold leading-tight text-foreground">
-              Not job listings. Recruiting intelligence.
+            <h2 className="text-3xl sm:text-[2rem] font-heading font-semibold leading-tight text-foreground">
+              Not another list of jobs. Three moves you can make.
             </h2>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <MoveTypeCard type="Person to Contact" example="A PM at a Series B fintech who went to your school" color="bg-blue-500/10 text-blue-700" />
-            <MoveTypeCard type="Proof of Work" example="Write a 1-page teardown of their latest feature launch" color="bg-purple-500/10 text-purple-700" />
-            <MoveTypeCard type="Outreach Draft" example="A warm, specific message referencing your shared background" color="bg-amber-500/10 text-amber-700" />
-            <MoveTypeCard type="Opportunity" example="An unlisted role at a company aligned with your thesis" color="bg-teal-500/10 text-teal-700" />
-            <MoveTypeCard type="Follow Up" example="Re-engage that conversation from 2 weeks ago with new context" color="bg-emerald-500/10 text-emerald-700" />
-            <MoveTypeCard type="Daily Brief" example="A morning digest summarizing the 3 highest-signal moves for today" color="bg-rose-500/10 text-rose-700" />
+            <MoveTypeCard type="Person to contact" example="A PM at a Series B fintech who shares your school and shipped a product you admire." color="bg-blue-500/8 text-blue-700" />
+            <MoveTypeCard type="Work worth sending" example="A one-page teardown of their latest feature that shows you think like their team." color="bg-violet-500/8 text-violet-700" />
+            <MoveTypeCard type="Message ready" example="A specific, warm message referencing shared context. Ready to review and send." color="bg-amber-500/8 text-amber-700" />
+            <MoveTypeCard type="Opportunity to explore" example="A role at a company aligned with what you are building. Not a generic listing." color="bg-teal-500/8 text-teal-700" />
+            <MoveTypeCard type="Follow-up due" example="That conversation from two weeks ago. New context to re-engage before it cools." color="bg-emerald-500/8 text-emerald-700" />
+            <MoveTypeCard type="Daily brief" example="Three moves, every morning. Prepared while you were away." color="bg-rose-500/8 text-rose-700" />
           </div>
         </div>
       </section>
 
-      {/* Mission section — deep green */}
-      <section className="relative z-10 mission-section py-16 sm:py-20">
-        <div className="mx-auto max-w-3xl px-6 text-center">
-          <p className="font-system text-teal-300/80 mb-4">Why we built Koda</p>
-          <h2 className="text-3xl sm:text-4xl font-heading font-bold leading-[1.15] text-white">
-            Your network should not depend on what you were born into.
-          </h2>
-          <p className="mt-5 text-[15.5px] leading-[1.65] text-teal-100/70 max-w-xl mx-auto">
-            We believe the best opportunities should find you based on what you build,
-            not who you know. Koda levels the playing field — one move at a time.
-          </p>
+      {/* Mission section */}
+      <section className="relative z-10 mission-section py-16 sm:py-24">
+        <div className="relative mx-auto max-w-4xl px-6">
+          <div className="text-center mb-12">
+            <p className="font-system text-teal-300/70 mb-4">Why we built Koda</p>
+            <h2 className="text-3xl sm:text-4xl font-heading font-semibold leading-[1.15] text-white">
+              Opportunity should not depend on who you already know.
+            </h2>
+            <p className="mt-5 text-[15px] leading-[1.7] text-teal-100/80 max-w-xl mx-auto">
+              Some students inherit a recruiting playbook. Others have to build
+              one themselves. Koda helps them find the path in, show what they
+              can do, and keep momentum alive.
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-3">
+            <MissionPillar
+              label="Access"
+              headline="Find the path in."
+              description="Koda finds the people and openings that match what you are building."
+            />
+            <MissionPillar
+              label="Signal"
+              headline="Show what you can do."
+              description="Proof of work ideas and outreach drafts that demonstrate your thinking."
+            />
+            <MissionPillar
+              label="Momentum"
+              headline="Keep the opportunity alive."
+              description="Follow-up timing and re-engagement before warm paths go cold."
+            />
+          </div>
         </div>
       </section>
 
@@ -178,32 +211,32 @@ export default function Home() {
         <div className="mx-auto max-w-lg px-6">
           <div className="text-center mb-8">
             <p className="font-system text-primary mb-3">Early access</p>
-            <h2 className="text-3xl font-heading font-bold text-foreground">
+            <h2 className="text-3xl font-heading font-semibold text-foreground">
               Join the first cohort
             </h2>
-            <p className="mt-3 text-[15px] text-foreground/70 leading-relaxed">
-              We&apos;re onboarding a small group of students who recruit
-              with intention. Your agent ships the day you sign up.
+            <p className="mt-3 text-[15px] text-muted-foreground leading-relaxed">
+              We are opening Koda to a small group of students first. Join to
+              receive your first personalized brief and help shape how Koda works.
             </p>
-            <p className="mt-2 font-system text-foreground/40">
-              Currently onboarding students from Berkeley, Stanford, and MIT
+            <p className="mt-2 font-system text-muted-foreground/60">
+              Built from 20+ student interviews
             </p>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
             <WaitlistForm />
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-border/40 py-6">
+      <footer className="relative z-10 border-t border-border/50 py-6">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="status-dot" />
             <span className="font-heading font-semibold text-sm text-foreground">Koda</span>
           </div>
-          <p className="text-xs text-foreground/40">
-            &copy; {new Date().getFullYear()} &middot; Built for students who recruit differently
+          <p className="font-system text-muted-foreground/50">
+            For students building their way in
           </p>
         </div>
       </footer>
@@ -211,146 +244,186 @@ export default function Home() {
   );
 }
 
-/* ─── Hero Product Mock ─── */
+/* ─── Hero Brief Mock ─── */
 
-function HeroProductMock() {
+function HeroBriefMock() {
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-xl overflow-hidden move-card">
-      {/* Window chrome */}
-      <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/60 bg-secondary/40">
-        <div className="size-2 rounded-full bg-border" />
-        <div className="size-2 rounded-full bg-border" />
-        <div className="size-2 rounded-full bg-border" />
-        <span className="ml-3 font-system text-foreground/30">koda &middot; agent inbox</span>
+    <div className="relative">
+      {/* Main brief card */}
+      <div className="rounded-2xl border border-border bg-card shadow-xl overflow-hidden move-card">
+        {/* Window chrome */}
+        <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/60 bg-secondary/50">
+          <div className="size-[7px] rounded-full bg-border" />
+          <div className="size-[7px] rounded-full bg-border" />
+          <div className="size-[7px] rounded-full bg-border" />
+          <span className="ml-3 font-system text-muted-foreground/50">koda</span>
+        </div>
+
+        {/* Agent status bar */}
+        <AgentStatus />
+
+        {/* Brief header */}
+        <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="status-dot" />
+            <span className="font-system text-muted-foreground">Koda Brief &middot; Today</span>
+          </div>
+          <span className="font-system text-primary">3 moves ready</span>
+        </div>
+
+        {/* Featured move — expanded */}
+        <div className="px-5 py-4 border-b border-border/40">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-blue-500/8 text-blue-700">
+              Person
+            </span>
+            <span className="font-system text-primary/60">High confidence</span>
+          </div>
+          <p className="text-sm font-medium text-foreground leading-snug">
+            Connect with Sarah Chen, PM at Notion
+          </p>
+          <p className="mt-1 text-[13px] text-muted-foreground leading-relaxed">
+            She shipped their API platform last month. Your database project shows similar product thinking.
+          </p>
+
+          {/* Brief details */}
+          <div className="mt-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="font-system text-primary/50 w-24 shrink-0 pt-0.5">Message</span>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">
+                Draft ready. References her API launch and your shared background.
+              </p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="font-system text-primary/50 w-24 shrink-0 pt-0.5">Proof</span>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">
+                Write a short API docs comparison. Share it and tag her.
+              </p>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="font-system text-primary/50 w-24 shrink-0 pt-0.5">Follow-up</span>
+              <p className="text-[13px] text-muted-foreground leading-relaxed">
+                5 days. Reference any new Notion updates.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Other moves — compact */}
+        <div className="divide-y divide-border/40">
+          <div className="mock-move-enter" style={{ animationDelay: "3000ms" }}>
+            <MockMoveCompact
+              type="Work"
+              typeColor="bg-violet-500/8 text-violet-700"
+              title="Write a product teardown of Linear"
+            />
+          </div>
+          <div className="mock-move-enter" style={{ animationDelay: "3200ms" }}>
+            <MockMoveCompact
+              type="Message"
+              typeColor="bg-amber-500/8 text-amber-700"
+              title="Draft for that startup founder you met last week"
+            />
+          </div>
+        </div>
+
+        {/* Action bar */}
+        <div className="px-5 py-2.5 bg-secondary/40 border-t border-border/40 flex items-center gap-3">
+          <span role="img" aria-label="Accept move" className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+            <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            Accept
+          </span>
+          <span role="img" aria-label="Pass on move" className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60">
+            <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            Pass
+          </span>
+          <span role="img" aria-label="Save move" className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/60">
+            <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+            Save
+          </span>
+          <span role="img" aria-label="Send move" className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+            <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+            Send
+          </span>
+        </div>
       </div>
 
-      {/* Agent status bar — animated */}
-      <AgentStatus />
-
-      {/* Brief header */}
-      <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="status-dot" />
-          <span className="font-system text-foreground/50">Today&apos;s brief</span>
-        </div>
-        <span className="font-system text-primary">3 moves</span>
+      {/* Floating mini-cards */}
+      <div
+        className="absolute -right-3 top-12 rounded-lg border border-border bg-card px-3 py-2 shadow-md hidden lg:flex items-center gap-2 page-enter"
+        style={{ animationDelay: "3400ms" }}
+      >
+        <div className="size-1.5 rounded-full bg-amber-500" />
+        <span className="font-system text-muted-foreground">1 follow-up due</span>
       </div>
-
-      {/* Mock moves — staggered appearance */}
-      <div className="divide-y divide-border/40">
-        <div className="mock-move-enter" style={{ animationDelay: "2900ms" }}>
-          <MockMove
-            type="Person"
-            typeColor="bg-blue-100 text-blue-800"
-            title="Connect with a PM at Notion"
-            reason="They shipped a feature similar to your side project last month."
-          />
-        </div>
-        <div className="mock-move-enter" style={{ animationDelay: "3100ms" }}>
-          <MockMove
-            type="Proof of Work"
-            typeColor="bg-purple-100 text-purple-800"
-            title="Write a product teardown of Linear"
-            reason="Your target companies use Linear — this shows you think like them."
-          />
-        </div>
-        <div className="mock-move-enter" style={{ animationDelay: "3300ms" }}>
-          <MockMove
-            type="Outreach"
-            typeColor="bg-amber-100 text-amber-800"
-            title="Draft a message to that startup founder"
-            reason="You both went to Berkeley and they're hiring for your exact role."
-          />
-        </div>
-      </div>
-
-      {/* Footer action bar */}
-      <div className="px-5 py-2.5 bg-secondary/30 border-t border-border/40 flex items-center gap-3">
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
-          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          Accept
-        </span>
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400">
-          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          Pass
-        </span>
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-          Save
-        </span>
-        <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-medium text-blue-500">
-          <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
-          Send
-        </span>
+      <div
+        className="absolute -left-3 bottom-16 rounded-lg border border-border bg-card px-3 py-2 shadow-md hidden lg:flex items-center gap-2 page-enter"
+        style={{ animationDelay: "3600ms" }}
+      >
+        <div className="size-1.5 rounded-full bg-primary" />
+        <span className="font-system text-muted-foreground">2 warm paths found</span>
       </div>
     </div>
   );
 }
 
-/* ─── Expanded Move Mock ─── */
+/* ─── Expanded Brief Mock ─── */
 
-function ExpandedMoveMock() {
+function ExpandedBriefMock() {
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-lg overflow-hidden max-w-2xl mx-auto">
+    <div className="rounded-2xl border border-border bg-card overflow-hidden max-w-2xl mx-auto">
       {/* Move header */}
       <div className="px-6 py-5 border-b border-border/40">
         <div className="flex items-center gap-2 mb-3">
-          <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-blue-100 text-blue-800">
+          <span className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-blue-500/8 text-blue-700">
             Person
           </span>
-          <span className="font-system text-foreground/40">High confidence</span>
+          <span className="font-system text-primary/50">High confidence</span>
         </div>
         <h3 className="text-lg font-heading font-semibold text-foreground leading-snug">
           Connect with Sarah Chen, PM at Notion
         </h3>
-        <p className="mt-1.5 text-sm text-primary/70 italic">
-          She shipped their recent API platform — your database project shows similar product instincts.
-        </p>
       </div>
 
-      {/* Expanded sections */}
+      {/* Structured sections */}
       <div className="divide-y divide-border/40">
-        {/* Outreach draft */}
-        <div className="px-6 py-4">
-          <p className="font-system text-primary mb-2">Suggested outreach</p>
-          <div className="rounded-lg bg-secondary/40 border border-border/40 px-4 py-3 text-sm text-foreground/80 leading-relaxed">
-            &ldquo;Hi Sarah — I saw Notion&apos;s API platform launch last month and thought
-            the developer experience decisions were really sharp. I&apos;m a junior at
-            Berkeley building something similar for student tools. Would love to hear
-            how your team approached the auth layer. Happy to share what I&apos;ve learned
-            building mine.&rdquo;
+        <BriefSection label="Why now">
+          She shipped their API platform last month. Your database project shows similar product thinking. Reaching out now is timely.
+        </BriefSection>
+
+        <BriefSection label="Message ready">
+          <div className="rounded-lg bg-secondary/60 border border-border/40 px-4 py-3 text-sm text-foreground/80 leading-relaxed">
+            Hi Sarah. I saw Notion&apos;s API platform launch last month and thought the DX
+            decisions were sharp. I&apos;m building something similar for student tools at
+            Berkeley. Would love to hear how your team approached the auth layer. Happy
+            to share what I have learned building mine.
           </div>
-        </div>
+        </BriefSection>
 
-        {/* Proof of work */}
-        <div className="px-6 py-4">
-          <p className="font-system text-primary mb-2">Proof of work idea</p>
-          <p className="text-sm text-foreground/70 leading-relaxed">
-            Write a short teardown of Notion&apos;s API documentation comparing it to
-            Linear&apos;s and Figma&apos;s. Share it on Twitter and tag her.
-          </p>
-        </div>
+        <BriefSection label="Proof of work">
+          Write a short teardown of Notion&apos;s API docs, comparing them to Linear&apos;s and
+          Figma&apos;s. Share it publicly and tag her.
+        </BriefSection>
 
-        {/* Follow-up timing */}
-        <div className="px-6 py-4">
-          <p className="font-system text-primary mb-2">Follow-up timing</p>
-          <p className="text-sm text-foreground/70 leading-relaxed">
-            If no response in 5 days, send a brief follow-up referencing any new
-            Notion updates. Keep it under 3 sentences.
-          </p>
-        </div>
+        <BriefSection label="Follow-up plan">
+          If no response in 5 days, send a brief follow-up referencing any new Notion
+          updates. Keep it under 3 sentences.
+        </BriefSection>
       </div>
 
       {/* Action bar */}
-      <div className="px-6 py-3 bg-secondary/30 border-t border-border/40 flex items-center gap-4">
+      <div className="px-6 py-3 bg-secondary/40 border-t border-border/40 flex items-center gap-4">
         <button className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 transition-colors" type="button">
           <svg aria-hidden="true" className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          Accept &amp; add to inbox
+          Accept
         </button>
-        <button className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/40 hover:text-foreground/60 transition-colors" type="button">
+        <button className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors" type="button">
           Edit draft
         </button>
-        <button className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-blue-500 hover:text-blue-600 transition-colors" type="button">
+        <button className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground/60 hover:text-muted-foreground transition-colors" type="button">
+          Pass
+        </button>
+        <button className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-[#075B59] transition-colors" type="button">
           <svg aria-hidden="true" className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
           Send now
         </button>
@@ -359,28 +432,36 @@ function ExpandedMoveMock() {
   );
 }
 
-/* ─── Shared sub-components ─── */
+/* ─── Sub-components ─── */
 
-function MockMove({
+function BriefSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="px-6 py-4">
+      <p className="font-system text-primary/60 mb-2">{label}</p>
+      {typeof children === "string" ? (
+        <p className="text-sm text-muted-foreground leading-relaxed">{children}</p>
+      ) : (
+        children
+      )}
+    </div>
+  );
+}
+
+function MockMoveCompact({
   type,
   typeColor,
   title,
-  reason,
 }: {
   type: string;
   typeColor: string;
   title: string;
-  reason: string;
 }) {
   return (
-    <div className="px-5 py-3.5 space-y-1.5">
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${typeColor}`}>
-          {type}
-        </span>
-      </div>
-      <p className="text-sm font-medium text-foreground leading-snug">{title}</p>
-      <p className="text-xs italic text-primary/70">{reason}</p>
+    <div className="px-5 py-3 flex items-center gap-3">
+      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider shrink-0 ${typeColor}`}>
+        {type}
+      </span>
+      <p className="text-sm text-foreground leading-snug truncate">{title}</p>
     </div>
   );
 }
@@ -401,11 +482,11 @@ function StepCard({
       className="group rounded-xl border border-border bg-card p-5 hover:border-primary/30 transition-colors page-enter"
       style={{ animationDelay: delay }}
     >
-      <span className="font-system text-primary/50 group-hover:text-primary transition-colors">
+      <span className="font-system text-primary/40 group-hover:text-primary transition-colors">
         {number}
       </span>
-      <h3 className="mt-2.5 text-lg font-heading font-semibold text-foreground">{title}</h3>
-      <p className="mt-1.5 text-sm text-foreground/60 leading-relaxed">{description}</p>
+      <h3 className="mt-2.5 text-[17px] font-semibold text-foreground">{title}</h3>
+      <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{description}</p>
     </div>
   );
 }
@@ -421,11 +502,33 @@ function MoveTypeCard({
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-2.5">
-      <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${color}`}>
+      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${color}`}>
         {type}
       </span>
-      <p className="text-sm text-foreground/60 leading-relaxed">
-        &ldquo;{example}&rdquo;
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        {example}
+      </p>
+    </div>
+  );
+}
+
+function MissionPillar({
+  label,
+  headline,
+  description,
+}: {
+  label: string;
+  headline: string;
+  description: string;
+}) {
+  return (
+    <div className="relative text-center sm:text-left">
+      <p className="font-system text-teal-300/50 mb-2">{label}</p>
+      <h3 className="text-lg font-heading font-semibold text-white leading-snug">
+        {headline}
+      </h3>
+      <p className="mt-2 text-sm text-teal-100/70 leading-relaxed">
+        {description}
       </p>
     </div>
   );

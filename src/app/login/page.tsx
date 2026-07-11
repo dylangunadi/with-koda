@@ -219,7 +219,7 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+                  className="w-full h-11 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-[#075B59] transition-colors"
                   disabled={loading}
                 >
                   {loading

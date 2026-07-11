@@ -51,11 +51,14 @@ export function WaitlistForm() {
   if (success) {
     return (
       <div className="rounded-2xl border border-primary/20 bg-accent p-8 text-center">
-        <p className="text-lg font-semibold text-foreground">
-          You&apos;re on the list!
+        <div className="flex justify-center mb-3">
+          <div className="status-dot" />
+        </div>
+        <p className="text-lg font-heading font-semibold text-foreground">
+          You&apos;re on the list.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          We&apos;ll reach out soon.
+          We will reach out when your brief is ready.
         </p>
       </div>
     );
@@ -131,7 +134,7 @@ export function WaitlistForm() {
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      <Button type="submit" disabled={loading} className="w-full h-11 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity">
+      <Button type="submit" disabled={loading} className="w-full h-11 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-[#075B59] transition-colors">
         {loading ? "Joining..." : "Join the waitlist"}
       </Button>
     </form>
