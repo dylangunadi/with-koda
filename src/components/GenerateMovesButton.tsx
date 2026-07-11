@@ -34,7 +34,7 @@ export function GenerateMovesButton() {
       ) : (
         <Sparkles className="size-4" />
       )}
-      <span>{loading ? "Generating..." : "Generate 3 recruiting moves"}</span>
+      <span>{loading ? "Running Koda..." : "Run Koda"}</span>
     </Button>
   );
 }

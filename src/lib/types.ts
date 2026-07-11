@@ -13,6 +13,9 @@ export interface Profile {
   linkedin_url: string | null;
   contacts_notes: string | null;
   semester_goal: string | null;
+  autonomous_enabled: boolean;
+  brief_frequency: string;
+  brief_email: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +50,7 @@ export interface RecruitingMove {
   outreach_draft: string | null;
   proof_of_work_idea: string | null;
   follow_up_timing: string | null;
+  source_note: string | null;
   confidence: number;
   status: MoveStatus;
   created_at: string;
@@ -61,3 +65,25 @@ export interface MoveEvent {
   metadata: Record<string, unknown>;
   created_at: string;
 }
+
+// --- Agent context types ---
+
+export interface FeedbackPattern {
+  boost_types: MoveType[];
+  boost_companies: string[];
+  reduce_types: MoveType[];
+  reduce_companies: string[];
+  tone_signals: string[];
+  edited_drafts_count: number;
+  total_accepted: number;
+  total_rejected: number;
+  total_sent: number;
+  total_saved: number;
+}
+
+export interface AgentContext {
+  prior_moves: RecruitingMove[];
+  move_events: MoveEvent[];
+  feedback: FeedbackPattern;
+}
+

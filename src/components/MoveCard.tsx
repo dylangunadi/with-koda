@@ -128,6 +128,12 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
           </p>
         )}
 
+        {move.source_note && (
+          <p className="text-xs italic text-primary/70">
+            Why this move: {move.source_note}
+          </p>
+        )}
+
         {expanded && (
           <div className="space-y-4 border-t border-border pt-4" style={{ animation: "fadeSlideIn 180ms ease-out" }}>
             {move.outreach_draft && (

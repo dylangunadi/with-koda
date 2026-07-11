@@ -35,7 +35,9 @@ cp .env.example .env.local
 # Fill in your Supabase and Anthropic keys
 
 # 4. Apply database migrations
-# Run supabase/migrations/20260710_koda_mvp_schema.sql
+# Run both migration files in order:
+# supabase/migrations/20260710_koda_mvp_schema.sql
+# supabase/migrations/20260710_koda_agentic_layer.sql
 # via the Supabase dashboard SQL editor or supabase db push
 
 # 5. Start the dev server
@@ -49,8 +51,10 @@ npm run dev
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anonymous/public key |
 | `ANTHROPIC_API_KEY` | No* | Anthropic API key for AI moves (*falls back to mock moves without) |
-| `SUPABASE_SERVICE_ROLE_KEY` | No | Service role key for server-side operations |
+| `SUPABASE_SERVICE_ROLE_KEY` | No | Service role key for autonomous briefs cron |
 | `NEXT_PUBLIC_APP_URL` | No | App URL (defaults to http://localhost:3000) |
+| `RESEND_API_KEY` | No | Resend API key for email digests (falls back to console logging) |
+| `CRON_SECRET` | No | Secret for protecting the autonomous brief cron endpoint |
 
 ## Deploy to Vercel
 
@@ -63,11 +67,10 @@ The app will be available at your Vercel domain (e.g., withkoda.app).
 
 ## Database
 
-The migration at `supabase/migrations/20260710_koda_mvp_schema.sql` creates:
+Two migrations in `supabase/migrations/`:
 
-- `profiles` — user recruiting profiles
-- `recruiting_moves` — AI-generated moves with status tracking
-- `move_events` — feedback event log
+1. `20260710_koda_mvp_schema.sql` — creates `profiles`, `recruiting_moves`, `move_events` tables with RLS
+2. `20260710_koda_agentic_layer.sql` — adds `source_note` to moves, autonomous brief settings to profiles
 
 All tables have RLS policies scoping data to the authenticated user.
 

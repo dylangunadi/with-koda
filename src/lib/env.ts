@@ -13,3 +13,11 @@ export function getSupabaseAnonKey(): string {
 export function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
+
+export function getResendApiKey(): string | null {
+  return process.env.RESEND_API_KEY ?? null;
+}
+
+export function getCronSecret(): string | null {
+  return process.env.CRON_SECRET ?? null;
+}
