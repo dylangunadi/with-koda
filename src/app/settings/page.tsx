@@ -25,6 +25,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [resumeFileName, setResumeFileName] = useState("")
+  const [resumeFileError, setResumeFileError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: "",
@@ -93,6 +95,21 @@ export default function SettingsPage() {
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
     setSuccess(false)
+  }
+
+  function handleResumeUpload(file: File | undefined) {
+    if (!file) return
+
+    setResumeFileError(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      update("resume_text", typeof reader.result === "string" ? reader.result : "")
+      setResumeFileName(file.name)
+    }
+    reader.onerror = () => {
+      setResumeFileError("We could not read that file. Please try another one.")
+    }
+    reader.readAsText(file)
   }
 
   async function handleSave() {
@@ -257,15 +274,31 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">Optional</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="resume_text">Resume</Label>
-              <Textarea
-                id="resume_text"
-                placeholder="Paste your resume or a summary"
-                value={form.resume_text}
-                onChange={(e) => update("resume_text", e.target.value)}
-                rows={6}
-                className="rounded-lg"
+              <Label htmlFor="resume_file">Resume</Label>
+              <Input
+                id="resume_file"
+                type="file"
+                accept=".pdf,.txt,.doc,.docx"
+                onChange={(e) => handleResumeUpload(e.target.files?.[0])}
+                className="h-11 rounded-lg file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium"
               />
+              <p className="text-xs text-muted-foreground">
+                Upload a PDF, TXT, DOC, or DOCX file to replace your current resume.
+              </p>
+              {resumeFileError && (
+                <p className="text-xs text-destructive">{resumeFileError}</p>
+              )}
+              {form.resume_text && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="mb-1 text-xs font-medium text-foreground">
+                    {resumeFileName || "Current resume preview"}
+                  </p>
+                  <p className="max-h-32 overflow-hidden whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+                    {form.resume_text.slice(0, 1000)}
+                    {form.resume_text.length > 1000 ? "…" : ""}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="linkedin_url">LinkedIn URL</Label>
