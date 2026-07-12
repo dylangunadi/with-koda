@@ -170,4 +170,5 @@ export interface AgentContext {
   prior_moves: RecruitingMove[];
   move_events: MoveEvent[];
   feedback: FeedbackPattern;
+  relationships: Relationship[];
 }

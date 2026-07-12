@@ -1,20 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ReviewConfirm } from "@/components/talk/ReviewConfirm";
+import { ConfirmationCard } from "@/components/talk/ConfirmationCard";
 import { VoiceInput } from "@/components/talk/VoiceInput";
 import { useSpeechRecognition } from "@/components/talk/useSpeechRecognition";
+import type { OngoingProposal } from "@/lib/koda/ai/provider";
 import type { OnboardingExtracted } from "@/lib/types";
 
-interface ChatMessage {
+export interface ChatMessage {
+  id?: string;
   role: "user" | "koda";
   content: string;
+  proposal?: OngoingProposal | null;
+  proposalStatus?: "pending" | "applied" | "declined";
 }
 
 interface TalkToKodaProps {
+  mode: "onboarding" | "ongoing";
   initialMessages: ChatMessage[];
   initialExtracted: OnboardingExtracted;
   initialMissing: string[];
@@ -23,10 +30,14 @@ interface TalkToKodaProps {
   initialAiMode: "live" | "mock";
 }
 
-const GREETING =
+const ONBOARDING_GREETING =
   "Hi, I am Koda. I help you figure out what to pursue, who to talk to, and what to send. A few quick questions so I can be useful, then you get your first brief.";
 
+const ONGOING_GREETING =
+  "What happened since we last talked? Tell me about conversations you have had, changes to your goals, or ask me what to do next.";
+
 export function TalkToKoda({
+  mode,
   initialMessages,
   initialExtracted,
   initialMissing,
@@ -35,14 +46,21 @@ export function TalkToKoda({
   initialAiMode,
 }: TalkToKodaProps) {
   const router = useRouter();
+  const onboarding = mode === "onboarding";
   const resumed = initialMessages.length > 0;
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (!resumed) {
-      return [{ role: "koda", content: `${GREETING} ${firstQuestion}` }];
+      return [
+        {
+          role: "koda",
+          content: onboarding ? `${ONBOARDING_GREETING} ${firstQuestion}` : ONGOING_GREETING,
+        },
+      ];
     }
     // On resume, restate the open question if the transcript ends with the
     // user's own message, so they are never left wondering what comes next.
     const needsPrompt =
+      onboarding &&
       initialMissing.length > 0 &&
       initialMessages[initialMessages.length - 1]?.role === "user";
     return needsPrompt
@@ -57,7 +75,7 @@ export function TalkToKoda({
   const [error, setError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<OnboardingExtracted>(initialExtracted);
   const [missing, setMissing] = useState<string[]>(initialMissing);
-  const [done, setDone] = useState(initialMissing.length === 0);
+  const [done, setDone] = useState(onboarding && initialMissing.length === 0);
   const [aiMode, setAiMode] = useState<string>(initialAiMode);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -99,11 +117,22 @@ export function TalkToKoda({
       }
       setInput("");
       voiceUsedRef.current = false;
-      setMessages((prev) => [...prev, { role: "koda", content: data.reply }]);
-      setExtracted(data.extracted ?? {});
-      setMissing(data.missing ?? []);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "koda",
+          content: data.reply,
+          id: data.proposalMessageId ?? undefined,
+          proposal: data.proposal ?? undefined,
+          proposalStatus: data.proposal ? "pending" : undefined,
+        },
+      ]);
+      if (onboarding) {
+        setExtracted(data.extracted ?? {});
+        setMissing(data.missing ?? []);
+        if (data.done) setDone(true);
+      }
       if (data.aiMode) setAiMode(data.aiMode);
-      if (data.done) setDone(true);
     } catch {
       setMessages((prev) => prev.slice(0, -1));
       setError("Network problem. Your message is still here, try again.");
@@ -131,9 +160,18 @@ export function TalkToKoda({
                 Offline sample mode
               </span>
             )}
-            <span className="font-system text-primary">
-              {done ? "Review" : `${answered} of ${totalFields} covered`}
-            </span>
+            {onboarding ? (
+              <span className="font-system text-primary">
+                {done ? "Review" : `${answered} of ${totalFields} covered`}
+              </span>
+            ) : (
+              <Link
+                href="/inbox"
+                className="font-system text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Back to inbox
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -143,16 +181,25 @@ export function TalkToKoda({
           className="mx-auto max-w-2xl px-6 py-8 space-y-6 page-enter"
           aria-live="polite"
         >
-          {resumed && (
+          {resumed && onboarding && (
             <p className="font-system text-muted-foreground text-center">
               Resumed. Nothing you said was lost.
             </p>
           )}
           {messages.map((m, i) =>
             m.role === "koda" ? (
-              <div key={i} className="max-w-[85%]">
-                <p className="font-system text-primary mb-1.5">Koda</p>
-                <p className="text-[15px] leading-relaxed text-foreground whitespace-pre-wrap">{m.content}</p>
+              <div key={m.id ?? i} className="max-w-[85%] space-y-3">
+                <div>
+                  <p className="font-system text-primary mb-1.5">Koda</p>
+                  <p className="text-[15px] leading-relaxed text-foreground whitespace-pre-wrap">{m.content}</p>
+                </div>
+                {m.proposal && m.id && (
+                  <ConfirmationCard
+                    messageId={m.id}
+                    proposal={m.proposal}
+                    initialStatus={m.proposalStatus ?? "pending"}
+                  />
+                )}
               </div>
             ) : (
               <div key={i} className="max-w-[85%] ml-auto">
@@ -168,13 +215,13 @@ export function TalkToKoda({
               <span className="font-system">Koda is thinking</span>
             </div>
           )}
-          {done && (
+          {done && onboarding && (
             <ReviewConfirm extracted={extracted} onDone={() => router.push("/inbox")} />
           )}
         </div>
       </div>
 
-      {!done && (
+      {(!done || !onboarding) && (
         <div className="relative z-10 border-t border-border/40 bg-background/95 backdrop-blur-md">
           <div className="mx-auto max-w-2xl px-6 py-4">
             {error && (
@@ -210,7 +257,7 @@ export function TalkToKoda({
                     send();
                   }
                 }}
-                placeholder="Type your answer"
+                placeholder={onboarding ? "Type your answer" : "Tell Koda what happened, or ask what to do next"}
                 aria-label="Message Koda"
                 rows={2}
                 className="min-h-[56px] max-h-40 resize-none rounded-lg text-[15px]"

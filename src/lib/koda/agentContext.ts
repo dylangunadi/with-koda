@@ -5,6 +5,7 @@ import type {
   MoveType,
   AgentContext,
   FeedbackPattern,
+  Relationship,
 } from "@/lib/types";
 
 /**
@@ -40,12 +41,21 @@ export async function buildAgentContext(
     events = (eventsData ?? []) as MoveEvent[];
   }
 
+  // Relationship memory captured through Talk to Koda (user-confirmed only).
+  const { data: relationshipRows } = await supabase
+    .from("relationships")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
   const feedback = extractFeedbackPatterns(priorMoves, events);
 
   return {
     prior_moves: priorMoves,
     move_events: events,
     feedback,
+    relationships: (relationshipRows ?? []) as Relationship[],
   };
 }
 

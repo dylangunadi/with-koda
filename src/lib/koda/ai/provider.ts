@@ -33,9 +33,68 @@ export interface OnboardingTurnResult {
 
 export type AiMode = "live" | "mock";
 
+export type OngoingIntent = "add_context" | "update_profile" | "ask_next_move" | "chat";
+
+export interface ProposedRelationship {
+  person_name: string;
+  organization: string | null;
+  role_title: string | null;
+  context: string | null;
+  interaction_date: string | null;
+  follow_up_date: string | null;
+}
+
+/** Whitelisted profile fields the conversation may propose to change. */
+export const UPDATABLE_PROFILE_FIELDS = [
+  "target_roles",
+  "target_companies",
+  "locations",
+  "recruiting_stage",
+  "timeline",
+  "work_auth",
+  "success_definition",
+] as const;
+export type UpdatableProfileField = (typeof UPDATABLE_PROFILE_FIELDS)[number];
+
+export interface ProfileDiffEntry {
+  field: UpdatableProfileField;
+  new_value: string | string[];
+  /** Filled server-side from the actual profile; never model-asserted. */
+  old_value?: string | string[] | null;
+}
+
+export interface OngoingProposal {
+  relationships?: ProposedRelationship[];
+  profile_diff?: ProfileDiffEntry[];
+}
+
+export interface OngoingGrounding {
+  recentMoves: { title: string; type: string; status: string; company: string | null; confidence: number }[];
+  relationships: {
+    person_name: string;
+    organization: string | null;
+    context: string | null;
+    follow_up_date: string | null;
+  }[];
+}
+
+export interface OngoingTurnInput {
+  profile: Profile;
+  userMessage: string;
+  history: { role: "user" | "koda"; content: string }[];
+  grounding: OngoingGrounding;
+}
+
+export interface OngoingTurnResult {
+  reply: string;
+  intent: OngoingIntent;
+  proposal?: OngoingProposal;
+}
+
 export interface KodaAI {
   mode: AiMode;
   onboardingTurn(input: OnboardingTurnInput): Promise<OnboardingTurnResult>;
+  ongoingTurn(input: OngoingTurnInput): Promise<OngoingTurnResult>;
   generateMoves(profile: Profile, agentContext?: AgentContext): Promise<GeneratedMove[]>;
 }
 

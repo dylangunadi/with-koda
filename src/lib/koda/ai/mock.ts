@@ -1,6 +1,15 @@
 import type { AgentContext, OnboardingExtracted, Profile } from "@/lib/types";
 import { ONBOARDING_FIELDS, missingFields, mergeExtracted } from "@/lib/koda/onboarding";
-import type { GeneratedMove, KodaAI, OnboardingTurnInput, OnboardingTurnResult } from "./provider";
+import type {
+  GeneratedMove,
+  KodaAI,
+  OnboardingTurnInput,
+  OnboardingTurnResult,
+  OngoingTurnInput,
+  OngoingTurnResult,
+  ProfileDiffEntry,
+  ProposedRelationship,
+} from "./provider";
 
 /**
  * Deterministic offline provider. Used when KODA_AI_MOCK=1 or when no
@@ -135,6 +144,135 @@ function pick<T>(arr: T[] | null | undefined, i = 0): T | null {
   return arr && arr.length > i ? arr[i] : null;
 }
 
+// ---------- ongoing conversation (deterministic, grounded in user text) ----------
+
+const CONTEXT_VERBS = /\b(spoke|talked|met|chatted|coffee|called|caught up|connected|had a call)\b/i;
+const UPDATE_MARKERS = /\b(no longer|not interested in|instead of|now (?:targeting|looking|want)|i(?:'m| am) now|change my|switch(?:ing)? (?:to|my)|update my)\b/i;
+const NEXT_MOVE_MARKERS = /\b(what should i do|what next|what's next|next move|what now|where should i focus)\b/i;
+
+function extractRelationship(message: string): ProposedRelationship | null {
+  // "…Maya at Notion…" / "…with Sam from Figma…" — names and orgs come only
+  // from the user's own words.
+  const pair = message.match(/\b([A-Z][a-z]+(?: [A-Z][a-z]+)?)\s+(?:at|from|of)\s+([A-Z][A-Za-z0-9&.' -]{1,40}?)(?=[\s,.!?]|$)/);
+  const withName = message.match(/\b(?:with|to)\s+([A-Z][a-z]+(?: [A-Z][a-z]+)?)\b/);
+  const personName = pair?.[1] ?? withName?.[1] ?? null;
+  if (!personName) return null;
+  const organization = pair?.[2]?.trim().replace(/[.,;]$/, "") ?? null;
+  const roleMatch = message.match(/\b(?:a|an|the|she'?s|he'?s|they'?re)\s+([A-Za-z ]{2,30}?(?:manager|engineer|designer|recruiter|analyst|pm|founder|director|lead))\b/i);
+  const today = new Date();
+  let interactionDate: string | null = null;
+  if (/\btoday\b/i.test(message)) interactionDate = today.toISOString().slice(0, 10);
+  else if (/\byesterday\b/i.test(message)) {
+    interactionDate = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
+  }
+  let followUpDate: string | null = null;
+  const followIn = message.match(/follow(?:ing)? up (?:in|after) (\d+) (day|week)s?/i);
+  if (followIn) {
+    const days = parseInt(followIn[1], 10) * (followIn[2].toLowerCase() === "week" ? 7 : 1);
+    followUpDate = new Date(today.getTime() + days * 86400000).toISOString().slice(0, 10);
+  }
+  return {
+    person_name: personName,
+    organization,
+    role_title: roleMatch?.[1]?.trim() ?? null,
+    context: message.slice(0, 500),
+    interaction_date: interactionDate,
+    follow_up_date: followUpDate,
+  };
+}
+
+function extractProfileDiff(fullMessage: string): ProfileDiffEntry[] {
+  const diff: ProfileDiffEntry[] = [];
+  // Drop negated clauses ("no longer interested in consulting") so extraction
+  // only sees what the user is moving TOWARD.
+  const message = fullMessage
+    .split(/,|;|\.\s/)
+    .filter((s) => !/\b(no longer|not interested|stopped|dropping|quit|done with)\b/i.test(s))
+    .join(", ");
+  // "targeting X roles" / "want X roles in Y"
+  const rolesMatch = message.match(/(?:targeting|want|looking for|interested in|switch(?:ing)? to)\s+([a-z][a-z /&-]*?(?:\s+roles?)?)(?:\s+(?:in|at)\s+|[,.!?]|$)/i);
+  if (rolesMatch) {
+    const roles = splitList(rolesMatch[1].replace(/\s+roles?$/i, "")).filter(Boolean);
+    if (roles.length) diff.push({ field: "target_roles", new_value: roles });
+  }
+  const locMatch = message.match(/\b(?:in|based in|move to|relocating to)\s+([A-Z][A-Za-z ]{1,30}?)(?:[,.!?]|$)/);
+  if (locMatch) {
+    diff.push({ field: "locations", new_value: splitList(locMatch[1]) });
+  }
+  const stageMatch = message.match(/\b(?:i'?m|i am) (?:now )?(interviewing|actively applying|networking|evaluating offers|just starting)\b/i);
+  if (stageMatch) {
+    diff.push({ field: "recruiting_stage", new_value: stageMatch[1].toLowerCase() });
+  }
+  return diff;
+}
+
+async function ongoingTurn(input: OngoingTurnInput): Promise<OngoingTurnResult> {
+  const message = input.userMessage;
+
+  if (NEXT_MOVE_MARKERS.test(message)) {
+    const followUp = [...input.grounding.relationships]
+      .filter((r) => r.follow_up_date)
+      .sort((a, b) => (a.follow_up_date! < b.follow_up_date! ? -1 : 1))[0];
+    if (followUp) {
+      return {
+        intent: "ask_next_move",
+        reply: `Your highest-leverage move is following up with ${followUp.person_name}${followUp.organization ? ` at ${followUp.organization}` : ""}. You planned to circle back around ${followUp.follow_up_date}, and a warm thread beats any cold application. Draft two lines referencing your last conversation and send them today.`,
+      };
+    }
+    const openMove = [...input.grounding.recentMoves]
+      .filter((m) => m.status === "generated" || m.status === "accepted" || m.status === "saved")
+      .sort((a, b) => b.confidence - a.confidence)[0];
+    if (openMove) {
+      return {
+        intent: "ask_next_move",
+        reply: `Finish the move already on your board: "${openMove.title}"${openMove.company ? ` (${openMove.company})` : ""}. It is ${openMove.status} and the strongest fit in your current brief. Complete it before adding anything new.`,
+      };
+    }
+    return {
+      intent: "ask_next_move",
+      reply: "Your board is clear. Run Koda from your inbox to generate a fresh brief, and tell me about any new conversations so I can work them into it.",
+    };
+  }
+
+  if (UPDATE_MARKERS.test(message)) {
+    const profileDiff = extractProfileDiff(message);
+    if (profileDiff.length) {
+      const summary = profileDiff
+        .map((d) => `${d.field.replace(/_/g, " ")} to ${Array.isArray(d.new_value) ? d.new_value.join(", ") : d.new_value}`)
+        .join(" and ");
+      return {
+        intent: "update_profile",
+        reply: `That changes your plan. I would update your ${summary}. Confirm below and every future brief uses the new direction; your history stays intact.`,
+        proposal: { profile_diff: profileDiff },
+      };
+    }
+    return {
+      intent: "chat",
+      reply: "Sounds like your goals moved. Tell me the new target in one line, for example: I am now targeting data roles in New York.",
+    };
+  }
+
+  if (CONTEXT_VERBS.test(message)) {
+    const relationship = extractRelationship(message);
+    if (relationship) {
+      return {
+        intent: "add_context",
+        reply: `Good context. I would remember ${relationship.person_name}${relationship.organization ? ` at ${relationship.organization}` : ""}${relationship.follow_up_date ? `, with a follow-up around ${relationship.follow_up_date}` : ""}. Confirm below and future briefs build on it.`,
+        proposal: { relationships: [relationship] },
+      };
+    }
+    return {
+      intent: "chat",
+      reply: "I want to save that correctly. Who did you talk to, and where do they work? For example: I spoke to Maya at Notion yesterday.",
+    };
+  }
+
+  return {
+    intent: "chat",
+    reply: "I can save new conversations you have had, update your goals, or tell you what to do next. Try: I met Sam at Linear yesterday, or: what should I do next?",
+  };
+}
+
 async function generateMoves(profile: Profile, agentContext?: AgentContext): Promise<GeneratedMove[]> {
   const role = pick(profile.target_roles) ?? "your target role";
   const company = pick(profile.target_companies) ?? "one of your target companies";
@@ -247,5 +385,6 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
 export const mockProvider: KodaAI = {
   mode: "mock",
   onboardingTurn,
+  ongoingTurn,
   generateMoves,
 };

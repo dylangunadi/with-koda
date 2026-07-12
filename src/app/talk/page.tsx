@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { missingFields, ONBOARDING_FIELDS } from "@/lib/koda/onboarding";
 import { isMockMode } from "@/lib/koda/ai/provider";
-import { TalkToKoda } from "@/components/talk/TalkToKoda";
+import type { OngoingProposal } from "@/lib/koda/ai/provider";
+import { logKodaEvent } from "@/lib/koda/events";
+import { TalkToKoda, type ChatMessage } from "@/components/talk/TalkToKoda";
 import type { KodaConversation, KodaMessage, OnboardingExtracted } from "@/lib/types";
 
 export default async function TalkPage() {
@@ -23,18 +25,16 @@ export default async function TalkPage() {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (profile) {
-    // Already onboarded: the inbox is home base.
-    redirect("/inbox");
-  }
+  const kind = profile ? "ongoing" : "onboarding";
 
-  // Resume any in-progress onboarding conversation.
   const { data: conversation } = await supabase
     .from("koda_conversations")
     .select("*")
     .eq("user_id", user.id)
-    .eq("kind", "onboarding")
+    .eq("kind", kind)
     .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   let messages: KodaMessage[] = [];
@@ -50,14 +50,47 @@ export default async function TalkPage() {
     messages = (messageRows ?? []) as KodaMessage[];
   }
 
+  const chatMessages: ChatMessage[] = messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    proposal: (m.payload?.proposal as OngoingProposal) ?? undefined,
+    proposalStatus:
+      (m.payload?.proposal_status as "pending" | "applied" | "declined") ?? undefined,
+  }));
+
+  if (profile) {
+    logKodaEvent(supabase, user.id, "talk_to_koda_reopened", {
+      has_history: chatMessages.length > 0,
+    });
+    return (
+      <TalkToKoda
+        mode="ongoing"
+        initialMessages={chatMessages}
+        initialExtracted={{}}
+        initialMissing={[]}
+        firstQuestion=""
+        totalFields={0}
+        initialAiMode={isMockMode() ? "mock" : "live"}
+      />
+    );
+  }
+
   const missing = missingFields(extracted);
   const firstQuestion =
     ONBOARDING_FIELDS.find((f) => f.key === missing[0])?.question ??
     "Tell me what you are working toward.";
 
+  if (chatMessages.length > 0) {
+    logKodaEvent(supabase, user.id, "onboarding_resumed", {
+      fields_remaining: missing.length,
+    });
+  }
+
   return (
     <TalkToKoda
-      initialMessages={messages.map((m) => ({ role: m.role, content: m.content }))}
+      mode="onboarding"
+      initialMessages={chatMessages}
       initialExtracted={extracted}
       initialMissing={missing}
       firstQuestion={firstQuestion}

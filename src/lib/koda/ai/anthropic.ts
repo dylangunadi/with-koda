@@ -3,12 +3,26 @@ import { getAnthropicApiKey } from "@/lib/env";
 import {
   MOVE_GENERATOR_SYSTEM_PROMPT,
   ONBOARDING_TURN_SYSTEM_PROMPT,
+  ONGOING_TURN_SYSTEM_PROMPT,
   buildOnboardingTurnPrompt,
+  buildOngoingTurnPrompt,
   buildUserPrompt,
 } from "@/lib/koda/prompts";
 import type { AgentContext, MoveSourceStatus, MoveType, OnboardingExtracted, Profile } from "@/lib/types";
-import type { GeneratedMove, KodaAI, OnboardingTurnInput, OnboardingTurnResult } from "./provider";
-import { KodaAiError } from "./provider";
+import type {
+  GeneratedMove,
+  KodaAI,
+  OnboardingTurnInput,
+  OnboardingTurnResult,
+  OngoingIntent,
+  OngoingProposal,
+  OngoingTurnInput,
+  OngoingTurnResult,
+  ProfileDiffEntry,
+  ProposedRelationship,
+  UpdatableProfileField,
+} from "./provider";
+import { KodaAiError, UPDATABLE_PROFILE_FIELDS } from "./provider";
 
 const MODEL = "claude-sonnet-4-5";
 
@@ -145,8 +159,92 @@ async function onboardingTurn(input: OnboardingTurnInput): Promise<OnboardingTur
   return { reply: reply.slice(0, 2000), extracted: sanitizeExtracted(parsed.extracted) };
 }
 
+const VALID_INTENTS: OngoingIntent[] = ["add_context", "update_profile", "ask_next_move", "chat"];
+
+function cleanString(v: unknown, max = 500): string | null {
+  return typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
+}
+
+function cleanDate(v: unknown): string | null {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
+
+/** Whitelist and coerce the model's proposal; anything unrecognized is dropped. */
+function sanitizeProposal(value: unknown): OngoingProposal | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const raw = value as Record<string, unknown>;
+  const out: OngoingProposal = {};
+
+  if (Array.isArray(raw.relationships)) {
+    const relationships = raw.relationships
+      .map((r): ProposedRelationship | null => {
+        if (typeof r !== "object" || r === null) return null;
+        const rel = r as Record<string, unknown>;
+        const personName = cleanString(rel.person_name, 120);
+        if (!personName) return null;
+        return {
+          person_name: personName,
+          organization: cleanString(rel.organization, 200),
+          role_title: cleanString(rel.role_title, 200),
+          context: cleanString(rel.context, 500),
+          interaction_date: cleanDate(rel.interaction_date),
+          follow_up_date: cleanDate(rel.follow_up_date),
+        };
+      })
+      .filter((r): r is ProposedRelationship => r !== null)
+      .slice(0, 5);
+    if (relationships.length) out.relationships = relationships;
+  }
+
+  if (Array.isArray(raw.profile_diff)) {
+    const diff = raw.profile_diff
+      .map((d): ProfileDiffEntry | null => {
+        if (typeof d !== "object" || d === null) return null;
+        const entry = d as Record<string, unknown>;
+        const field = entry.field as UpdatableProfileField;
+        if (!UPDATABLE_PROFILE_FIELDS.includes(field)) return null;
+        const isList = ["target_roles", "target_companies", "locations"].includes(field);
+        if (isList) {
+          const list = (Array.isArray(entry.new_value) ? entry.new_value : [entry.new_value])
+            .map((s) => cleanString(s, 120))
+            .filter((s): s is string => s !== null)
+            .slice(0, 12);
+          return list.length ? { field, new_value: list } : null;
+        }
+        const str = cleanString(entry.new_value, 500);
+        return str ? { field, new_value: str } : null;
+      })
+      .filter((d): d is ProfileDiffEntry => d !== null)
+      .slice(0, 7);
+    if (diff.length) out.profile_diff = diff;
+  }
+
+  return out.relationships || out.profile_diff ? out : undefined;
+}
+
+async function ongoingTurn(input: OngoingTurnInput): Promise<OngoingTurnResult> {
+  const anthropic = client();
+  const result = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1000,
+    system: ONGOING_TURN_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: buildOngoingTurnPrompt(input) }],
+  });
+  const raw = result.content[0]?.type === "text" ? result.content[0].text : "{}";
+  const parsed = parseJson(raw) as Record<string, unknown>;
+  const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : "";
+  if (!reply) {
+    throw new KodaAiError("Model returned no reply");
+  }
+  const intent = VALID_INTENTS.includes(parsed.intent as OngoingIntent)
+    ? (parsed.intent as OngoingIntent)
+    : "chat";
+  return { reply: reply.slice(0, 2000), intent, proposal: sanitizeProposal(parsed.proposal) };
+}
+
 export const anthropicProvider: KodaAI = {
   mode: "live",
   onboardingTurn,
+  ongoingTurn,
   generateMoves,
 };
