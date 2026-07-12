@@ -19,6 +19,7 @@ function groupMoves(moves: RecruitingMove[]) {
     saved: [],
     sent: [],
     rejected: [],
+    completed: [],
   };
   for (const move of moves) {
     groups[move.status].push(move);
