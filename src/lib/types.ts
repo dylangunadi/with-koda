@@ -116,6 +116,21 @@ export interface KodaConversation {
   updated_at: string;
 }
 
+export interface Relationship {
+  id: string;
+  user_id: string;
+  person_name: string;
+  organization: string | null;
+  role_title: string | null;
+  context: string | null;
+  source_message: string | null;
+  source_message_id: string | null;
+  interaction_date: string | null;
+  follow_up_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface KodaMessage {
   id: string;
   conversation_id: string;
