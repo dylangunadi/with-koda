@@ -49,11 +49,11 @@ export default function SettingsPage() {
   })
 
   useEffect(() => {
-    const briefStatus = new URLSearchParams(window.location.search).get("brief")
-    if (briefStatus === "confirmed") setBriefNotice("Your email is confirmed. Autonomous briefs are now active.")
-    if (briefStatus === "invalid") setError("That confirmation link is invalid or expired. Enable briefs again to request a new one.")
-
     async function loadProfile() {
+      const briefStatus = new URLSearchParams(window.location.search).get("brief")
+      if (briefStatus === "confirmed") setBriefNotice("Your email is confirmed. Autonomous briefs are now active.")
+      if (briefStatus === "invalid") setError("That confirmation link is invalid or expired. Enable briefs again to request a new one.")
+
       const supabase = createClient()
       const {
         data: { user },
