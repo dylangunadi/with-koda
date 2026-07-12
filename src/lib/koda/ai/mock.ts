@@ -214,9 +214,12 @@ async function ongoingTurn(input: OngoingTurnInput): Promise<OngoingTurnResult> 
       .filter((r) => r.follow_up_date)
       .sort((a, b) => (a.follow_up_date! < b.follow_up_date! ? -1 : 1))[0];
     if (followUp) {
+      // follow_up_date may arrive as YYYY-MM-DD or a full ISO timestamp
+      // depending on the driver; show the date part only.
+      const followUpDay = String(followUp.follow_up_date).slice(0, 10);
       return {
         intent: "ask_next_move",
-        reply: `Your highest-leverage move is following up with ${followUp.person_name}${followUp.organization ? ` at ${followUp.organization}` : ""}. You planned to circle back around ${followUp.follow_up_date}, and a warm thread beats any cold application. Draft two lines referencing your last conversation and send them today.`,
+        reply: `Your highest-leverage move is following up with ${followUp.person_name}${followUp.organization ? ` at ${followUp.organization}` : ""}. You planned to circle back around ${followUpDay}, and a warm thread beats any cold application. Draft two lines referencing your last conversation and send them today.`,
       };
     }
     const openMove = [...input.grounding.recentMoves]
