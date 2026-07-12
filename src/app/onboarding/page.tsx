@@ -62,6 +62,8 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
+  const [resumeFileName, setResumeFileName] = useState("")
+  const [resumeFileError, setResumeFileError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     name: "",
@@ -103,6 +105,21 @@ export default function OnboardingPage() {
 
   function update(field: string, value: string | string[]) {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function handleResumeUpload(file: File | undefined) {
+    if (!file) return
+
+    setResumeFileError(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      update("resume_text", typeof reader.result === "string" ? reader.result : "")
+      setResumeFileName(file.name)
+    }
+    reader.onerror = () => {
+      setResumeFileError("We could not read that file. Please try another one.")
+    }
+    reader.readAsText(file)
   }
 
   function toggleChip(field: "target_roles" | "industries" | "locations" | "focus", value: string) {
@@ -399,18 +416,31 @@ export default function OnboardingPage() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="resume_text">Experience summary</Label>
-                    <Textarea
-                      id="resume_text"
-                      placeholder="Paste your resume text, LinkedIn summary, or describe what you have built. A few bullet points is fine."
-                      value={form.resume_text}
-                      onChange={(e) => update("resume_text", e.target.value)}
-                      rows={5}
-                      className="rounded-lg"
+                    <Label htmlFor="resume_file">Resume</Label>
+                    <Input
+                      id="resume_file"
+                      type="file"
+                      accept=".pdf,.txt,.doc,.docx"
+                      onChange={(e) => handleResumeUpload(e.target.files?.[0])}
+                      className="h-11 rounded-lg file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Optional. The more Koda knows, the more specific your briefs will be.
+                      Optional. Accepted formats: PDF, TXT, DOC, and DOCX.
                     </p>
+                    {resumeFileError && (
+                      <p className="text-xs text-destructive">{resumeFileError}</p>
+                    )}
+                    {form.resume_text && (
+                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                        <p className="mb-1 text-xs font-medium text-foreground">
+                          {resumeFileName || "Resume preview"}
+                        </p>
+                        <p className="max-h-28 overflow-hidden whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
+                          {form.resume_text.slice(0, 800)}
+                          {form.resume_text.length > 800 ? "…" : ""}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Work authorization</Label>
