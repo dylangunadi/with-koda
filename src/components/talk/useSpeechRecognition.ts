@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 export type SpeechState = "unsupported" | "idle" | "listening" | "processing" | "denied" | "error";
 
@@ -38,16 +38,26 @@ function getSpeechRecognition(): SpeechRecognitionCtor | null {
  * the caller; this hook never owns or clears composer text, so a recognition
  * failure can never lose anything the user typed.
  */
+const noopSubscribe = () => () => {};
+
 export function useSpeechRecognition(onFinalTranscript: (text: string) => void) {
-  const [state, setState] = useState<SpeechState>("unsupported");
+  // Hydration-safe support detection: false on the server, real on the client.
+  const supported = useSyncExternalStore(
+    noopSubscribe,
+    () => getSpeechRecognition() !== null,
+    () => false
+  );
+  const [state, setState] = useState<Exclude<SpeechState, "unsupported">>("idle");
   const [interim, setInterim] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const callbackRef = useRef(onFinalTranscript);
-  callbackRef.current = onFinalTranscript;
 
   useEffect(() => {
-    if (getSpeechRecognition()) setState("idle");
+    callbackRef.current = onFinalTranscript;
+  }, [onFinalTranscript]);
+
+  useEffect(() => {
     return () => recognitionRef.current?.abort();
   }, []);
 
@@ -112,5 +122,11 @@ export function useSpeechRecognition(onFinalTranscript: (text: string) => void) 
     }
   }, []);
 
-  return { state, interim, errorMessage, start, stop };
+  return {
+    state: (supported ? state : "unsupported") as SpeechState,
+    interim,
+    errorMessage,
+    start,
+    stop,
+  };
 }
