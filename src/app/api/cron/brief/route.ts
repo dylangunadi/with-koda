@@ -9,7 +9,7 @@ import type { Profile } from "@/lib/types";
 /**
  * Cron endpoint for autonomous Koda briefs.
  * Called by Vercel Cron on schedule. Protected by CRON_SECRET.
- * Generates moves for all users with autonomous_enabled = true
+ * Generates moves for confirmed users with autonomous_enabled = true
  * and emails them a digest.
  */
 export async function GET(request: NextRequest) {
@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
     .select("*")
-    .eq("autonomous_enabled", true);
+    .eq("autonomous_enabled", true)
+    .eq("brief_confirmed", true);
 
   if (profilesError) {
     console.error("[cron:brief] Failed to fetch profiles:", profilesError);
