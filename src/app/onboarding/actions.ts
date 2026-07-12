@@ -54,7 +54,7 @@ export async function saveProfile(data: ProfileFormData) {
     focus_options: data.focus_options,
     semester_goal: data.semester_goal || null,
     autonomous_enabled: data.autonomous_enabled ?? false,
-    brief_frequency: ["daily", "weekly"].includes(data.brief_frequency || "") ? data.brief_frequency : "daily",
+    brief_frequency: ["daily", "weekly", "manual"].includes(data.brief_frequency || "") ? data.brief_frequency : "daily",
     brief_email: data.brief_email || null,
     updated_at: new Date().toISOString(),
   }

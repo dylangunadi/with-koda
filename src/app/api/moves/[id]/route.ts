@@ -4,12 +4,15 @@ import type { MoveEventType } from "@/lib/types";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// 'sent' is intentionally absent: no sending integration exists, so the API
+// must not accept a claim that a message went out. Legacy 'sent' rows remain
+// readable but no new ones can be created.
 const STATUS_TO_EVENT: Record<string, MoveEventType> = {
   generated: "generated",
   accepted: "accepted",
   rejected: "rejected",
-  sent: "sent",
   saved: "saved",
+  completed: "completed",
 };
 
 const MAX_DRAFT_LENGTH = 10000;

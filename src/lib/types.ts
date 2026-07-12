@@ -26,7 +26,8 @@ export interface Profile {
   updated_at: string;
 }
 
-// 'sent' is a legacy status kept for existing rows; the UI no longer offers it.
+// 'sent' is a legacy status kept for existing rows; the UI and API no longer
+// accept it (Koda has no sending integration, so nothing may claim "sent").
 export type MoveStatus = "generated" | "accepted" | "rejected" | "sent" | "saved" | "completed";
 
 export type MoveSourceStatus = "user_provided" | "inferred" | "ai_suggested";

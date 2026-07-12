@@ -9,12 +9,12 @@ import {
   Check,
   X,
   Bookmark,
-  Send,
+  CheckCheck,
   ChevronDown,
   ChevronUp,
   Save,
 } from "lucide-react";
-import type { RecruitingMove, MoveStatus, MoveType } from "@/lib/types";
+import type { RecruitingMove, MoveStatus, MoveSourceStatus, MoveType } from "@/lib/types";
 
 const TYPE_STYLES: Record<MoveType, string> = {
   opportunity: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
@@ -32,6 +32,19 @@ const TYPE_LABELS: Record<MoveType, string> = {
   application_strategy: "Application Strategy",
 };
 
+const PRIORITY_LABELS: Record<string, string> = {
+  now: "Do now",
+  this_week: "This week",
+  soon: "Soon",
+};
+
+// Source honesty: every move states where it came from.
+const SOURCE_LABELS: Record<MoveSourceStatus, string> = {
+  user_provided: "From what you told Koda",
+  inferred: "Inferred from your profile",
+  ai_suggested: "Koda's suggestion",
+};
+
 export function MoveCard({ move }: { move: RecruitingMove }) {
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(move.outreach_draft ?? "");
@@ -40,6 +53,8 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
   const router = useRouter();
 
   const subtitle = [move.company, move.person].filter(Boolean).join(" · ");
+  const accepted = move.status === "accepted";
+  const completed = move.status === "completed" || move.status === "sent";
 
   async function updateStatus(status: MoveStatus) {
     setActionLoading(status);
@@ -82,9 +97,28 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
       <div className="px-5 pt-5 pb-3 sm:px-6">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2 min-w-0">
-            <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${TYPE_STYLES[move.type]}`}>
-              {TYPE_LABELS[move.type]}
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${TYPE_STYLES[move.type]}`}>
+                {TYPE_LABELS[move.type]}
+              </span>
+              {move.priority && PRIORITY_LABELS[move.priority] && (
+                <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {PRIORITY_LABELS[move.priority]}
+                </span>
+              )}
+              {accepted && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent-foreground">
+                  <Check className="size-3" aria-hidden />
+                  Accepted
+                </span>
+              )}
+              {completed && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent-foreground">
+                  <CheckCheck className="size-3" aria-hidden />
+                  Completed
+                </span>
+              )}
+            </div>
             <h3 className="text-base font-heading font-semibold text-foreground leading-snug">
               {move.title}
             </h3>
@@ -126,8 +160,23 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
           </p>
         )}
 
+        <p className="font-system text-muted-foreground">
+          {SOURCE_LABELS[move.source_status] ?? SOURCE_LABELS.ai_suggested}
+          {typeof move.confidence === "number" && ` · ${Math.round(move.confidence * 100)}% fit`}
+          {move.effort && ` · ${move.effort}`}
+        </p>
+
         {expanded && (
           <div className="space-y-4 border-t border-border/40 pt-4 mt-3" style={{ animation: "fadeSlideIn 180ms ease-out" }}>
+            {move.expected_outcome && (
+              <div className="space-y-1">
+                <label className="font-system text-muted-foreground">
+                  Expected Outcome
+                </label>
+                <p className="text-sm leading-relaxed">{move.expected_outcome}</p>
+              </div>
+            )}
+
             {move.outreach_draft && (
               <div className="space-y-2">
                 <label className="font-system text-muted-foreground">
@@ -175,47 +224,61 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
         )}
       </div>
 
-      {/* Action bar */}
-      <div className="flex items-center gap-1 border-t border-border/40 px-4 py-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("accepted")}
-          disabled={actionLoading !== null}
-          className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-        >
-          <Check className="size-4" />
-          <span>Accept</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("rejected")}
-          disabled={actionLoading !== null}
-          className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
-        >
-          <X className="size-4" />
-          <span>Reject</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("saved")}
-          disabled={actionLoading !== null}
-        >
-          <Bookmark className="size-4" />
-          <span>Save</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("sent")}
-          disabled={actionLoading !== null}
-          className="text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
-        >
-          <Send className="size-4" />
-          <span>Sent</span>
-        </Button>
+      {/* Action bar. Accepting means "I intend to act on this" — Koda never
+          sends anything externally, so there is no Send action. */}
+      <div className="flex flex-wrap items-center gap-1 border-t border-border/40 px-4 py-2">
+        {!completed && !accepted && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => updateStatus("accepted")}
+            disabled={actionLoading !== null}
+            className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+          >
+            <Check className="size-4" />
+            <span>Accept move</span>
+          </Button>
+        )}
+        {!completed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => updateStatus("completed")}
+            disabled={actionLoading !== null}
+            className="text-primary hover:bg-accent"
+          >
+            <CheckCheck className="size-4" />
+            <span>Mark completed</span>
+          </Button>
+        )}
+        {!completed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => updateStatus("saved")}
+            disabled={actionLoading !== null || move.status === "saved"}
+          >
+            <Bookmark className="size-4" />
+            <span>Save for later</span>
+          </Button>
+        )}
+        {!completed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => updateStatus("rejected")}
+            disabled={actionLoading !== null || move.status === "rejected"}
+            className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
+          >
+            <X className="size-4" />
+            <span>Not relevant</span>
+          </Button>
+        )}
+        {completed && (
+          <p className="px-2 py-1 font-system text-muted-foreground">
+            Completed. Koda uses this to shape your next brief.
+          </p>
+        )}
       </div>
     </div>
   );

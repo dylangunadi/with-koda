@@ -380,9 +380,11 @@ export default function SettingsPage() {
           <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="autonomous_enabled">Enable Autonomous Briefs</Label>
+                <Label htmlFor="autonomous_enabled">Scheduled Koda Briefs</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Koda will generate moves and email you a digest
+                  Off means manual only: you run Koda from your inbox when you
+                  want a brief. On, Koda prepares briefs on a schedule and can
+                  email you a digest.
                 </p>
               </div>
               <button
@@ -406,7 +408,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Frequency</Label>
                   <Select
-                    value={form.brief_frequency}
+                    value={["daily", "weekly"].includes(form.brief_frequency) ? form.brief_frequency : "daily"}
                     onValueChange={(val) => update("brief_frequency", val ?? "daily")}
                   >
                     <SelectTrigger className="w-full h-11 rounded-lg">
