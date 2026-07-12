@@ -59,7 +59,7 @@ fi
 
 # Optional warnings
 if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-  echo -e "Warning: ANTHROPIC_API_KEY not set — move generation will use mock data."
+  echo -e "Warning: ANTHROPIC_API_KEY not set — Koda will run in labeled offline sample mode."
 fi
 
 echo -e "${GREEN}Environment OK. Starting dev server...${NC}"

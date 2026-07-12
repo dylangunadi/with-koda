@@ -1,4 +1,46 @@
 import type { Profile, AgentContext } from "@/lib/types";
+import type { OnboardingTurnInput } from "@/lib/koda/ai/provider";
+import { ONBOARDING_FIELDS } from "@/lib/koda/onboarding";
+
+export const ONBOARDING_TURN_SYSTEM_PROMPT = `You are Koda, a calm and useful recruiting agent for students. You are running the student's first onboarding conversation. Your goals each turn: extract structured facts from what the student just said, then ask the single most useful next question.
+
+RULES — follow exactly:
+1. Never ask about a field that already has a value in KNOWN FIELDS. Do not make the student repeat themselves.
+2. Extract only facts the student actually stated. Never invent, embellish, or assume values.
+3. Ask exactly one question per turn, aimed at the first field in STILL MISSING.
+4. Keep replies short: one brief acknowledgment sentence referencing what they said, then the question. No pep talks, no filler.
+5. If STILL MISSING will be empty after this extraction, do not ask another question. Tell the student you have what you need and that they should review what you learned and confirm.
+6. Plain language. No em dashes. No corporate speak.
+7. Return ONLY a JSON object, no markdown fences, no preamble, no explanation of your reasoning. The JSON is your entire output.
+
+Output shape:
+{"reply": "<what you say to the student>", "extracted": {<only fields the student just provided>}}
+
+extracted may contain: name, school, year (strings); target_roles, target_companies, locations (arrays of strings); recruiting_stage, timeline, work_auth, contacts, proof_points, success_definition (strings). Omit fields the student did not just provide.`;
+
+export function buildOnboardingTurnPrompt(input: OnboardingTurnInput): string {
+  const parts: string[] = [];
+  parts.push("KNOWN FIELDS (do not ask about these again):");
+  parts.push(JSON.stringify(input.extracted));
+  parts.push("\nSTILL MISSING (in priority order):");
+  parts.push(
+    input.missing
+      .map((k) => {
+        const q = ONBOARDING_FIELDS.find((f) => f.key === k)?.question;
+        return `- ${k}${q ? ` (suggested angle: ${q})` : ""}`;
+      })
+      .join("\n") || "(nothing)"
+  );
+  if (input.history.length) {
+    parts.push("\nRECENT CONVERSATION:");
+    for (const m of input.history.slice(-8)) {
+      parts.push(`${m.role === "user" ? "Student" : "Koda"}: ${m.content}`);
+    }
+  }
+  parts.push(`\nStudent's new message: ${input.userMessage}`);
+  parts.push("\nReturn the JSON object now.");
+  return parts.join("\n");
+}
 
 export const MOVE_GENERATOR_SYSTEM_PROMPT = `You are Koda, a recruiting strategist for undergrad students breaking into competitive careers. Your job is to generate specific, actionable recruiting moves that a student can execute this week.
 
@@ -27,7 +69,13 @@ Each object must have these exact keys:
 - proof_of_work_idea: string (or empty string if not applicable)
 - follow_up_timing: string
 - source_note: string (brief note explaining why Koda chose this move based on the student's history and feedback patterns, e.g. "You accepted similar proof-of-work moves before" or "New move type to diversify your strategy")
-- confidence: number between 0 and 1`;
+- confidence: number between 0 and 1
+- priority: one of "now" | "this_week" | "soon"
+- effort: realistic time estimate like "30 min" or "1-2 hours"
+- expected_outcome: string (what completing this move actually gets the student)
+- source_status: one of "user_provided" (built directly from facts the student stated), "inferred" (a reasonable conclusion from their profile), "ai_suggested" (your idea, not grounded in a specific stated fact)
+
+GROUNDING: Use only facts from the student's profile and agent memory below. If a move rests on something the student did not state, its source_status must be "ai_suggested". Never present an invented opening, event, or person as if it were verified.`;
 
 export function buildUserPrompt(
   profile: Profile,
@@ -70,6 +118,21 @@ export function buildUserPrompt(
   }
   if (profile.semester_goal) {
     parts.push(`\nSemester goal: ${profile.semester_goal}`);
+  }
+  if (profile.recruiting_stage) {
+    parts.push(`Recruiting stage: ${profile.recruiting_stage}`);
+  }
+  if (profile.timeline) {
+    parts.push(`Timing and deadlines: ${profile.timeline}`);
+  }
+  if (profile.proof_points) {
+    parts.push(`Projects and proof of work: ${profile.proof_points}`);
+  }
+  if (profile.contacts_notes) {
+    parts.push(`Existing contacts (stated by the student, usable by name): ${profile.contacts_notes}`);
+  }
+  if (profile.success_definition) {
+    parts.push(`Their definition of success: ${profile.success_definition}`);
   }
 
   // Inject agent memory / feedback context

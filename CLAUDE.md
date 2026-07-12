@@ -50,5 +50,5 @@ See `.env.example` for required variables. Core required:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 Optional but important:
-- `ANTHROPIC_API_KEY` (falls back to mock moves without)
+- `ANTHROPIC_API_KEY` (without it Koda runs in labeled offline sample mode; KODA_AI_MOCK=1 forces it)
 - `SUPABASE_SERVICE_ROLE_KEY` (needed for cron/waitlist)

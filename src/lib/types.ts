@@ -13,6 +13,7 @@ export interface Profile {
   linkedin_url: string | null;
   focus_options: string[];
   semester_goal: string | null;
+  contacts_notes: string | null;
   recruiting_stage: string | null;
   timeline: string | null;
   proof_points: string | null;
