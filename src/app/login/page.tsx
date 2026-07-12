@@ -56,20 +56,30 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md page-enter">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-heading font-semibold tracking-tight text-foreground">
-            Koda
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background px-4 py-12">
+      <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-80 w-80 -translate-x-1/2 rounded-full bg-primary/8 blur-3xl dark:bg-primary/10" aria-hidden="true" />
+
+      <div className="relative z-10 w-full max-w-md page-enter">
+        <div className="mb-8 text-center stagger-1">
+          <div className="mb-4 flex items-center justify-center gap-2 font-system text-primary">
+            <span className="status-dot" />
+            <span>// system online</span>
+          </div>
+          <h1 className="flex items-center justify-center gap-3 text-4xl font-heading font-semibold tracking-tight text-foreground">
+            <span className="status-dot" /> Koda
           </h1>
           <p className="mt-2 text-muted-foreground text-sm">
-            Your AI recruiting partner
+            Your opportunity agent
           </p>
         </div>
 
-        <Card>
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">
+        <Card className="briefing-accent relative overflow-hidden border-border/70 bg-card/90 shadow-xl shadow-primary/5 backdrop-blur-sm stagger-2 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary">
+          <CardHeader className="space-y-2 pl-8">
+            <div className="font-system text-muted-foreground">
+              // secure access
+            </div>
+            <CardTitle className="text-2xl tracking-tight">
               {mode === "signin" ? "Welcome back" : "Create an account"}
             </CardTitle>
             <CardDescription>
@@ -80,9 +90,9 @@ export default function LoginPage() {
           </CardHeader>
 
           <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5 pl-8">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="font-system text-foreground">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -95,7 +105,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="font-system text-foreground">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -117,7 +127,7 @@ export default function LoginPage() {
               )}
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-3">
+            <CardFooter className="flex flex-col gap-3 pl-8">
               <Button
                 type="submit"
                 className="w-full"

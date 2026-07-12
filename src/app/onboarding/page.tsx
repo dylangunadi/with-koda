@@ -23,10 +23,10 @@ import {
 import { saveProfile } from "./actions"
 
 const STEPS = [
-  { title: "About You", description: "Let's start with the basics" },
-  { title: "Targets", description: "What are you aiming for?" },
-  { title: "Background", description: "Help us understand your experience" },
-  { title: "Goals", description: "What does success look like?" },
+  { title: "Identity", description: "Who is Koda working for?" },
+  { title: "Targets", description: "Where should Koda look?" },
+  { title: "Background", description: "What has Koda got to work with?" },
+  { title: "Objectives", description: "What should Koda optimize for?" },
 ]
 
 const YEAR_OPTIONS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
@@ -69,41 +69,57 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-lg page-enter">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-heading font-semibold tracking-tight text-foreground">
-            Koda
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background px-4 py-12 sm:px-6">
+      <div className="grain pointer-events-none absolute inset-0" aria-hidden="true" />
+      <div className="pointer-events-none absolute -top-36 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-primary/8 blur-3xl dark:bg-primary/10" aria-hidden="true" />
+
+      <div className="relative z-10 w-full max-w-xl page-enter">
+        <div className="text-center mb-8 stagger-1">
+          <div className="mb-4 flex items-center justify-center gap-2 font-system text-primary">
+            <span className="status-dot" />
+            <span>// agent intelligence briefing</span>
+          </div>
+          <h1 className="flex items-center justify-center gap-3 text-4xl font-heading font-semibold tracking-tight text-foreground">
+            <span className="status-dot" /> Koda
           </h1>
           <p className="mt-2 text-muted-foreground text-sm">
-            Let's set up your recruiting profile
+            Teach your agent what opportunity looks like
           </p>
         </div>
 
         {/* Progress indicator */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          {STEPS.map((_, i) => (
+        <div className="mb-8 grid grid-cols-4 gap-2 stagger-2">
+          {STEPS.map((item, i) => (
             <div
               key={i}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i <= step
-                  ? "bg-primary w-8"
-                  : "bg-muted w-6"
-              }`}
-            />
+              className="min-w-0 text-center"
+            >
+              <div
+                className={`mx-auto mb-2 h-1.5 rounded-full transition-all duration-300 ${
+                  i <= step
+                    ? "bg-primary w-full"
+                    : "bg-muted w-3/4"
+                }`}
+              />
+              <span className={`font-system transition-colors ${
+                i === step ? "text-primary" : "text-muted-foreground"
+              }`}>
+                {item.title}
+              </span>
+            </div>
           ))}
         </div>
-        <p className="text-center text-xs text-muted-foreground mb-6">
-          Step {step + 1} of {STEPS.length}
-        </p>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">{STEPS[step].title}</CardTitle>
+        <Card key={step} className="briefing-accent page-enter relative overflow-hidden border-border/70 bg-card/90 shadow-xl shadow-primary/5 backdrop-blur-sm before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary">
+          <CardHeader className="pl-8">
+            <div className="font-system text-primary">
+              // agent calibration — step {step + 1}
+            </div>
+            <CardTitle className="text-2xl tracking-tight">{STEPS[step].title}</CardTitle>
             <CardDescription>{STEPS[step].description}</CardDescription>
           </CardHeader>
 
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5 pl-8">
             {step === 0 && (
               <>
                 <div className="space-y-2">
@@ -266,7 +282,7 @@ export default function OnboardingPage() {
             )}
           </CardContent>
 
-          <div className="flex items-center justify-between px-6 pb-6">
+          <div className="flex items-center justify-between px-6 pb-6 pl-8">
             <Button
               variant="outline"
               onClick={() => setStep((s) => s - 1)}
@@ -279,7 +295,7 @@ export default function OnboardingPage() {
               <Button onClick={() => setStep((s) => s + 1)}>Next</Button>
             ) : (
               <Button onClick={handleSubmit} disabled={loading}>
-                {loading ? "Saving..." : "Start recruiting"}
+                {loading ? "Saving..." : "Deploy Koda"}
               </Button>
             )}
           </div>
