@@ -41,3 +41,12 @@ next-env.d.ts
 
 # reference repo
 /recruit-crm
+.env*
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
