@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logKodaEvent, type KodaEventName } from "@/lib/koda/events";
 import type { MoveEventType } from "@/lib/types";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -122,6 +123,18 @@ export async function PATCH(
 
   if (eventError) {
     console.error("Failed to insert move event:", eventError);
+  }
+
+  const PRODUCT_EVENTS: Record<string, KodaEventName> = {
+    accepted: "move_accepted",
+    rejected: "move_rejected",
+    saved: "move_saved",
+    completed: "move_completed",
+    edited: "move_edited",
+  };
+  const productEvent = PRODUCT_EVENTS[eventType];
+  if (productEvent) {
+    logKodaEvent(supabase, user.id, productEvent, { move_id: id, move_type: updated.type });
   }
 
   return NextResponse.json({ move: updated });

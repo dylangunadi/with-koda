@@ -51,6 +51,19 @@ export function ReviewConfirm({ extracted, onDone }: ReviewConfirmProps) {
     if (submitting) return;
     setSubmitting(true);
     setError(null);
+    const reviewEdited =
+      form.name !== (extracted.name ?? "") ||
+      form.school !== (extracted.school ?? "") ||
+      form.year !== (extracted.year ?? "") ||
+      form.target_roles !== (extracted.target_roles ?? []).join(", ") ||
+      form.target_companies !== (extracted.target_companies ?? []).join(", ") ||
+      form.locations !== (extracted.locations ?? []).join(", ") ||
+      form.work_auth !== (extracted.work_auth ?? "") ||
+      form.recruiting_stage !== (extracted.recruiting_stage ?? "") ||
+      form.timeline !== (extracted.timeline ?? "") ||
+      form.contacts !== (extracted.contacts ?? "") ||
+      form.proof_points !== (extracted.proof_points ?? "") ||
+      form.success_definition !== (extracted.success_definition ?? "");
     try {
       const result = await confirmOnboarding({
         name: form.name,
@@ -66,6 +79,7 @@ export function ReviewConfirm({ extracted, onDone }: ReviewConfirmProps) {
         proof_points: form.proof_points,
         success_definition: form.success_definition,
         brief_frequency: frequency,
+        review_edited: reviewEdited,
       });
       if (!result.success) {
         setError(result.error ?? "Could not save. Try again.");

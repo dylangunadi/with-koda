@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getKodaAI } from "@/lib/koda/ai/provider";
 import { buildAgentContext } from "@/lib/koda/agentContext";
 import { insertBriefWithMoves } from "@/lib/koda/briefs";
+import { logKodaEvent } from "@/lib/koda/events";
 import type { Brief, Profile } from "@/lib/types";
 
 export interface ReviewedProfile {
@@ -20,6 +21,8 @@ export interface ReviewedProfile {
   proof_points: string;
   success_definition: string;
   brief_frequency: "manual" | "weekly" | "daily";
+  /** Whether the user changed any prefilled field on the review screen. */
+  review_edited?: boolean;
 }
 
 export interface ConfirmResult {
@@ -121,8 +124,15 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
     .eq("kind", "onboarding")
     .eq("status", "active");
 
+  logKodaEvent(supabase, user.id, "onboarding_completed");
+  logKodaEvent(supabase, user.id, "brief_preference_set", { frequency });
+  if (review.review_edited) {
+    logKodaEvent(supabase, user.id, "profile_review_edited");
+  }
+
   // First brief. A failure here must not undo onboarding: report it and let
   // the user retry from the inbox.
+  logKodaEvent(supabase, user.id, "first_brief_generation_started");
   try {
     const { data: profile } = await supabase
       .from("profiles")
@@ -135,6 +145,7 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
     const { brief } = await insertBriefWithMoves(supabase, user.id, "onboarding", generated, {
       ai_mode: ai.mode,
     });
+    logKodaEvent(supabase, user.id, "first_brief_generated", { ai_mode: ai.mode });
     return { success: true, briefId: brief.id };
   } catch (err) {
     // A concurrent confirm may have won the onboarding-brief unique index;
@@ -151,6 +162,7 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
       }
     }
     console.error("First brief generation failed:", err);
+    logKodaEvent(supabase, user.id, "first_brief_generation_failed");
     return {
       success: true,
       briefError: "Your profile is saved, but the first brief failed. Generate it from your inbox.",

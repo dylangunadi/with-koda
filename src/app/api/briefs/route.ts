@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendBriefConfirmationEmail } from "@/lib/koda/email";
+import { logKodaEvent } from "@/lib/koda/events";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -18,9 +19,11 @@ export async function POST(request: Request) {
       pending_brief_frequency: null,
       pending_brief_email: null,
     }).eq("user_id", user.id);
-    return error
-      ? NextResponse.json({ error: error.message }, { status: 500 })
-      : NextResponse.json({ enabled: false });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    logKodaEvent(supabase, user.id, "scheduled_brief_disabled");
+    return NextResponse.json({ enabled: false });
   }
 
   const email = body.email?.trim();
@@ -47,5 +50,6 @@ export async function POST(request: Request) {
   if (!result.sent) {
     return NextResponse.json({ error: "We could not send the confirmation email. Try again shortly." }, { status: 502 });
   }
+  logKodaEvent(supabase, user.id, "scheduled_brief_enabled", { frequency, pending_confirmation: true });
   return NextResponse.json({ pending: true });
 }

@@ -1,31 +1,37 @@
 # TODOS — Koda
 
-## NOW: Guided first action
+## DONE: Talk to Koda MVP (guided first action)
 
-Status: ready
+Status: shipped on feat/talk-to-koda-onboarding (see docs/OVERNIGHT_REPORT.md)
 
-Goal:
-A new user completes one meaningful Koda action within three minutes.
+Delivered: conversational onboarding at /talk (text + push-to-talk voice with
+full text fallback), structured onboarding persistence with resume, review and
+confirm with brief schedule choice, persisted first Koda Brief, honest move
+action semantics (Accept / Mark completed / Save for later / Not relevant; Send
+removed), ongoing Talk to Koda (relationship memory, profile-update proposals,
+next-move recommendations), idempotent scheduled briefs, and koda_events
+instrumentation. 20 Playwright tests cover the critical paths.
 
-Acceptance criteria:
-- New user sees one obvious primary action.
-- The flow has loading, empty and error states.
-- User input survives a failed AI request.
-- Completing the action updates relationship state.
-- Relevant Playwright test passes.
-- scripts/validate.sh passes.
+## Analytics
 
-Out of scope:
-- New contact-management system
-- Broad dashboard redesign
-- Changes to unrelated workflows
+Product events live in the `koda_events` table (see src/lib/koda/events.ts for
+the event list and the strict no-user-content properties rule).
 
-Validation:
-- [ ] Running app exercised
-- [ ] Targeted Playwright test
-- [ ] Full validation
-- [ ] Codex review
-- [ ] Preview manually inspected
+Activation = a user who completed onboarding, received a first brief, and took
+at least one move action:
+
+```sql
+select count(*) from (
+  select user_id from koda_events
+  group by user_id
+  having bool_or(event_name = 'onboarding_completed')
+     and bool_or(event_name = 'first_brief_generated')
+     and bool_or(event_name in ('move_accepted','move_rejected','move_saved','move_completed','move_edited'))
+) activated;
+```
+
+Funnel rates: compare distinct-user counts of `onboarding_started`,
+`onboarding_completed`, `first_brief_generated`, and any `move_*` event.
 
 ## Now
 

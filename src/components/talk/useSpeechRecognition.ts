@@ -102,6 +102,11 @@ export function useSpeechRecognition(onFinalTranscript: (text: string) => void) 
         setErrorMessage(
           "Microphone is blocked. Keep typing, or allow the mic in your browser settings."
         );
+        fetch("/api/events", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: "voice_permission_denied" }),
+        }).catch(() => {});
       } else {
         setState("error");
         setErrorMessage("Could not hear that. Your typed text is untouched, try again or keep typing.");
