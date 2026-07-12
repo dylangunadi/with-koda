@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ReviewConfirm } from "@/components/talk/ReviewConfirm";
+import { VoiceInput } from "@/components/talk/VoiceInput";
+import { useSpeechRecognition } from "@/components/talk/useSpeechRecognition";
 import type { OnboardingExtracted } from "@/lib/types";
 
 interface ChatMessage {
@@ -59,6 +61,15 @@ export function TalkToKoda({
   const [aiMode, setAiMode] = useState<string>(initialAiMode);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const voiceUsedRef = useRef(false);
+
+  // Voice transcripts append to the composer; they never replace typed text,
+  // and the user can edit before sending.
+  const speech = useSpeechRecognition((transcript) => {
+    voiceUsedRef.current = true;
+    setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${transcript}` : transcript));
+    inputRef.current?.focus();
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -74,7 +85,10 @@ export function TalkToKoda({
       const res = await fetch("/api/talk", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, inputMode: "text" }),
+        body: JSON.stringify({
+          message,
+          inputMode: voiceUsedRef.current ? "voice" : "text",
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -84,6 +98,7 @@ export function TalkToKoda({
         return;
       }
       setInput("");
+      voiceUsedRef.current = false;
       setMessages((prev) => [...prev, { role: "koda", content: data.reply }]);
       setExtracted(data.extracted ?? {});
       setMissing(data.missing ?? []);
@@ -201,6 +216,12 @@ export function TalkToKoda({
                 className="min-h-[56px] max-h-40 resize-none rounded-lg text-[15px]"
                 autoFocus
               />
+              <VoiceInput
+                state={speech.state}
+                onStart={speech.start}
+                onStop={speech.stop}
+                disabled={sending}
+              />
               <Button
                 type="submit"
                 disabled={sending || !input.trim()}
@@ -209,9 +230,20 @@ export function TalkToKoda({
                 {sending ? "Sending" : "Send"}
               </Button>
             </form>
-            <p className="mt-2 font-system text-muted-foreground">
-              Enter to send. Shift plus Enter for a new line.
-            </p>
+            <div className="mt-2 min-h-4" aria-live="polite">
+              {speech.state === "listening" ? (
+                <span className="inline-flex items-center gap-1.5 font-system text-primary">
+                  <span className="status-dot" aria-hidden />
+                  Listening{speech.interim ? `: ${speech.interim}` : ""}
+                </span>
+              ) : speech.errorMessage ? (
+                <span className="font-system text-destructive">{speech.errorMessage}</span>
+              ) : (
+                <span className="font-system text-muted-foreground">
+                  Enter to send. Shift plus Enter for a new line.
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
