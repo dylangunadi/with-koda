@@ -18,7 +18,7 @@ const MOCK_NOTE = "Offline sample mode: grounded only in your onboarding answers
 function splitList(text: string): string[] {
   return text
     .split(/,|\band\b|\bor\b|;/i)
-    .map((s) => s.replace(/^(maybe|mostly|probably|ideally|like)\s+/i, "").trim())
+    .map((s) => s.trim().replace(/^(maybe|mostly|probably|ideally|like)\s+/i, "").trim())
     .filter((s) => s.length > 0 && s.length < 80)
     .slice(0, 8);
 }
@@ -64,8 +64,10 @@ function extractForField(
     case "timeline":
       return { timeline: firstSentence(text, 200) };
     case "locations": {
-      const delta: Partial<OnboardingExtracted> = { locations: splitList(text.replace(/\b(no|any|remote is fine)[^,]*visa[^,]*/gi, "")) };
-      if (/visa|sponsor|citizen|authoriz|\bopt\b|\bcpt\b|international/i.test(text)) {
+      const authPattern = /visa|sponsor|citizen|authoriz|\bopt\b|\bcpt\b|international/i;
+      const locations = splitList(text).filter((item) => !authPattern.test(item));
+      const delta: Partial<OnboardingExtracted> = { locations };
+      if (authPattern.test(text)) {
         delta.work_auth = firstSentence(text, 160);
       }
       if (!delta.locations || delta.locations.length === 0) delta.locations = [firstSentence(text, 80)];
