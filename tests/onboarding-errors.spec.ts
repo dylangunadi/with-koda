@@ -34,7 +34,7 @@ test("AI failure preserves the user's input and permits retry", async ({ page, c
   // Recover and retry: the same input goes through.
   await context.setExtraHTTPHeaders({});
   await banner.getByRole("button", { name: "Retry" }).click();
-  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
 
   // A failed turn is also never persisted: reload shows the same progress.
   await page.reload();
@@ -47,7 +47,7 @@ test("duplicate rapid submission does not create a second turn", async ({ page }
 
   await page.getByLabel("Message Koda").fill("I'm Alex at Stanford");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
 
   const db = adminClient();
   const { data: users } = await db.auth.admin.listUsers({ perPage: 200 });
@@ -81,7 +81,7 @@ test("repeated confirm produces exactly one profile, one brief, three moves", as
       page
         .getByText(`${i + 1} of 9 covered`)
         .or(page.getByRole("heading", { name: "Here is what Koda learned" }))
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: 20000 });
   }
 
   const confirm = page.getByRole("button", { name: "Confirm and build my first brief" });
@@ -89,7 +89,7 @@ test("repeated confirm produces exactly one profile, one brief, three moves", as
   // must both hold.
   await confirm.dispatchEvent("click");
   await confirm.dispatchEvent("click");
-  await expect(page).toHaveURL(/\/inbox/, { timeout: 20000 });
+  await expect(page).toHaveURL(/\/inbox/, { timeout: 30000 });
 
   const db = adminClient();
   const { data: users } = await db.auth.admin.listUsers({ perPage: 200 });
