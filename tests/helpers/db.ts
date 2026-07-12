@@ -80,10 +80,13 @@ export async function seedOnboardedUser(prefix: string) {
     "Set your application plan for November",
   ];
   const types = ["person_to_contact", "proof_of_work", "application_strategy"];
+  // Backdated so seeded data never trips the generation rate limit.
+  const seededAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const { data: moves, error: movesError } = await db
     .from("recruiting_moves")
     .insert(
       titles.map((title, i) => ({
+        created_at: seededAt,
         user_id: user.id,
         brief_id: brief.id,
         title,
