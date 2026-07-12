@@ -7,6 +7,41 @@ interface BriefEmailParams {
   moves: GeneratedMove[];
 }
 
+interface BriefConfirmationEmailParams {
+  to: string;
+  userName: string;
+  token: string;
+}
+
+export async function sendBriefConfirmationEmail({
+  to,
+  userName,
+  token,
+}: BriefConfirmationEmailParams): Promise<{ sent: boolean; method: "resend" | "logged" }> {
+  const apiKey = getResendApiKey();
+  const confirmUrl = `${getAppUrl()}/api/briefs/confirm?token=${encodeURIComponent(token)}`;
+  const subject = "Confirm your Koda briefs";
+  const html = `<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#faf9f7; padding:32px"><div style="max-width:560px;margin:0 auto;background:white;border-radius:12px;padding:32px"><h1 style="font-size:20px;color:#0d7377">Confirm autonomous briefs</h1><p>Hey ${escapeHtml(userName)}, confirm this email address to start receiving your Koda briefs.</p><p style="margin:28px 0"><a href="${escapeHtml(confirmUrl)}" style="background:#0d7377;color:white;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600">Confirm briefs</a></p><p style="font-size:12px;color:#888">This link expires in 24 hours. If you did not request briefs, you can ignore this email.</p></div></body></html>`;
+
+  if (!apiKey) {
+    console.log("[koda:email] No RESEND_API_KEY — logging confirmation instead.");
+    console.log(`[koda:email] To: ${to}`);
+    console.log(`[koda:email] Confirmation URL: ${confirmUrl}`);
+    return { sent: false, method: "logged" };
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: "Koda <koda@withkoda.app>", to: [to], subject, html }),
+  });
+  if (!res.ok) {
+    console.error("[koda:email] Resend confirmation error:", await res.text());
+    return { sent: false, method: "resend" };
+  }
+  return { sent: true, method: "resend" };
+}
+
 export async function sendBriefEmail({
   to,
   userName,

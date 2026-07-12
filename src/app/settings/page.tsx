@@ -27,6 +27,8 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState(false)
   const [resumeFileName, setResumeFileName] = useState("")
   const [resumeFileError, setResumeFileError] = useState<string | null>(null)
+  const [briefNotice, setBriefNotice] = useState<string | null>(null)
+  const [savedBrief, setSavedBrief] = useState({ enabled: false, confirmed: false, frequency: "daily", email: "" })
 
   const [form, setForm] = useState({
     name: "",
@@ -47,6 +49,10 @@ export default function SettingsPage() {
   })
 
   useEffect(() => {
+    const briefStatus = new URLSearchParams(window.location.search).get("brief")
+    if (briefStatus === "confirmed") setBriefNotice("Your email is confirmed. Autonomous briefs are now active.")
+    if (briefStatus === "invalid") setError("That confirmation link is invalid or expired. Enable briefs again to request a new one.")
+
     async function loadProfile() {
       const supabase = createClient()
       const {
@@ -65,6 +71,13 @@ export default function SettingsPage() {
         .single<Profile>()
 
       if (data) {
+        const briefSettings = {
+          enabled: data.autonomous_enabled ?? false,
+          confirmed: data.brief_confirmed ?? false,
+          frequency: data.brief_frequency ?? "daily",
+          email: data.brief_email ?? "",
+        }
+        setSavedBrief(briefSettings)
         setForm({
           name: data.name ?? "",
           school: data.school ?? "",
@@ -93,6 +106,7 @@ export default function SettingsPage() {
   function update(field: string, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
     setSuccess(false)
+    setBriefNotice(null)
   }
 
   function handleResumeUpload(file: File | undefined) {
@@ -116,12 +130,42 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       const splitCommas = (s: string) => s.split(",").map(v => v.trim()).filter(Boolean)
+      const briefChanged = form.brief_frequency !== savedBrief.frequency || form.brief_email.trim() !== savedBrief.email
+      const needsConfirmation = form.autonomous_enabled && (!savedBrief.enabled || !savedBrief.confirmed || briefChanged)
       await saveProfile({
         ...form,
+        autonomous_enabled: needsConfirmation ? false : form.autonomous_enabled,
         target_roles: splitCommas(form.target_roles),
         industries: splitCommas(form.industries),
         locations: splitCommas(form.locations),
       })
+
+      if (needsConfirmation || !form.autonomous_enabled) {
+        const response = await fetch("/api/briefs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            enabled: form.autonomous_enabled,
+            email: form.brief_email,
+            frequency: form.brief_frequency,
+          }),
+        })
+        const result = await response.json() as { error?: string }
+        if (!response.ok) throw new Error(result.error || "Could not update autonomous briefs")
+        if (needsConfirmation) {
+          setBriefNotice("Check your email to confirm briefs. They will remain off until you confirm.")
+          setSavedBrief((prev) => ({ ...prev, enabled: false, confirmed: false }))
+        } else {
+          setSavedBrief((prev) => ({ ...prev, enabled: false, confirmed: false }))
+        }
+      } else {
+        setSavedBrief({
+          enabled: form.autonomous_enabled,
+          confirmed: savedBrief.confirmed,
+          frequency: form.brief_frequency,
+          email: form.brief_email.trim(),
+        })
+      }
       setSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
@@ -404,6 +448,12 @@ export default function SettingsPage() {
           <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-3 text-sm text-primary flex items-center gap-2">
             <div className="status-dot" />
             Profile saved successfully.
+          </div>
+        )}
+
+        {briefNotice && (
+          <div className="rounded-lg bg-primary/10 border border-primary/20 px-4 py-3 text-sm text-primary">
+            {briefNotice}
           </div>
         )}
 

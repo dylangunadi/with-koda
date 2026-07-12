@@ -16,6 +16,7 @@ export interface Profile {
   autonomous_enabled: boolean;
   brief_frequency: string;
   brief_email: string | null;
+  brief_confirmed: boolean;
   created_at: string;
   updated_at: string;
 }
