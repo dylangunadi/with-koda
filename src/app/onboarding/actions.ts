@@ -10,7 +10,6 @@ interface ProfileFormData {
   target_companies: string
   industries: string[]
   locations: string[]
-  company_size: string
   work_auth: string
   resume_text: string
   linkedin_url: string
@@ -49,10 +48,8 @@ export async function saveProfile(data: ProfileFormData) {
     target_companies: splitCommas(data.target_companies),
     industries: data.industries,
     locations: data.locations,
-    company_size: data.company_size || null,
     work_auth: data.work_auth || null,
     resume_text: data.resume_text || null,
-    experience_summary: data.resume_text || null,
     linkedin_url: data.linkedin_url || null,
     focus_options: data.focus_options,
     semester_goal: data.semester_goal || null,

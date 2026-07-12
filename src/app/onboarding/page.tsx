@@ -47,12 +47,6 @@ const YEAR_OPTIONS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
 
 const ROLE_OPTIONS = ["PM", "SWE", "Design", "Data", "Startup Ops", "Research", "Marketing", "Other"]
 const INDUSTRY_OPTIONS = ["Tech", "Finance", "Healthcare", "AI / ML", "Consumer", "B2B SaaS", "Other"]
-const COMPANY_SIZE_OPTIONS = [
-  { value: "startup", label: "Startups (< 50 people)" },
-  { value: "growth", label: "Growth stage (50-500)" },
-  { value: "big_tech", label: "Big tech / large companies" },
-  { value: "any", label: "Open to any size" },
-]
 const LOCATION_OPTIONS = ["San Francisco", "New York", "Seattle", "Austin", "Los Angeles", "Remote", "Open to anything"]
 const FOCUS_OPTIONS = [
   { value: "land_internship", label: "Land an internship this semester" },
@@ -76,7 +70,6 @@ export default function OnboardingPage() {
     target_roles: [] as string[],
     target_companies: "",
     industries: [] as string[],
-    company_size: "",
     locations: [] as string[],
     work_auth: "",
     resume_text: "",
@@ -134,7 +127,6 @@ export default function OnboardingPage() {
         target_companies: form.target_companies,
         industries: form.industries,
         locations: form.locations,
-        company_size: form.company_size,
         work_auth: form.work_auth,
         resume_text: form.resume_text,
         linkedin_url: form.linkedin_url,
@@ -355,24 +347,6 @@ export default function OnboardingPage() {
                     <p className="text-xs text-muted-foreground">
                       Skip if you are open to anything.
                     </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Company size preference</Label>
-                    <Select
-                      value={form.company_size}
-                      onValueChange={(val) => update("company_size", val ?? "")}
-                    >
-                      <SelectTrigger className="w-full h-11 rounded-lg">
-                        <SelectValue placeholder="Any size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMPANY_SIZE_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="space-y-2.5">
                     <Label>Where do you want to work?</Label>

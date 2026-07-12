@@ -8,10 +8,8 @@ export interface Profile {
   target_companies: string[];
   industries: string[];
   locations: string[];
-  company_size: string | null;
   work_auth: string | null;
   resume_text: string | null;
-  experience_summary: string | null;
   linkedin_url: string | null;
   focus_options: string[];
   semester_goal: string | null;
@@ -88,4 +86,3 @@ export interface AgentContext {
   move_events: MoveEvent[];
   feedback: FeedbackPattern;
 }
-

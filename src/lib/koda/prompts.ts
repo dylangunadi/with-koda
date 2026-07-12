@@ -55,18 +55,13 @@ export function buildUserPrompt(
   if (locations.length > 0) {
     parts.push(`Preferred locations: ${locations.join(", ")}`);
   }
-  if (profile.company_size) {
-    parts.push(`Company size preference: ${profile.company_size}`);
-  }
   if (profile.work_auth) {
     parts.push(`Work authorization: ${profile.work_auth}`);
   }
   if (profile.linkedin_url) {
     parts.push(`LinkedIn: ${profile.linkedin_url}`);
   }
-  if (profile.experience_summary) {
-    parts.push(`\nExperience summary:\n${profile.experience_summary}`);
-  } else if (profile.resume_text) {
+  if (profile.resume_text) {
     parts.push(`\nResume:\n${profile.resume_text}`);
   }
   const focusOptions = profile.focus_options ?? [];

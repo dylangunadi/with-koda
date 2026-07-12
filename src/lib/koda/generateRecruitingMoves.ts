@@ -62,54 +62,6 @@ function sanitizeMove(move: Record<string, unknown>): GeneratedMove {
   };
 }
 
-export function generateMockMoves(profile: Profile): GeneratedMove[] {
-  const role = (profile.target_roles ?? [])[0] || "Software Engineer";
-  const company = (profile.target_companies ?? [])[0] || "a top tech company";
-  const secondCompany = (profile.target_companies ?? [])[1] || "a growth-stage startup";
-
-  return [
-    {
-      title: `Research ${company}'s recent product launches`,
-      type: "application_strategy",
-      company,
-      person: null,
-      fit_reason: `Understanding ${company}'s product direction will help you tailor your application and stand out in interviews.`,
-      suggested_action: `Spend 30 minutes reading ${company}'s recent blog posts and press releases, then write 3 bullet points on how your skills connect to their current priorities.`,
-      outreach_draft: "",
-      proof_of_work_idea: `Write a one-page analysis of ${company}'s latest product feature and how you would improve it, using your ${role} perspective.`,
-      follow_up_timing: "Complete within 2 days",
-      source_note: "Starting with research on your top target company.",
-      confidence: 0.85,
-    },
-    {
-      title: `Connect with a ${role} at ${secondCompany}`,
-      type: "person_to_contact",
-      company: secondCompany,
-      person: `a mid-level ${role} who joined within the last 2 years`,
-      fit_reason: `Recent hires at ${secondCompany} understand the current hiring bar and can share what actually mattered in their process.`,
-      suggested_action: `Find this person on LinkedIn and send a brief, specific connection request mentioning a shared interest or background.`,
-      outreach_draft: `Hi, I'm ${profile.name || "a student"} at ${profile.school || "university"} exploring ${role} roles. Your path into ${secondCompany} caught my eye because it seems closely aligned with what I'm building toward. Would you be open to a 15 minute chat sometime this week?`,
-      proof_of_work_idea: "",
-      follow_up_timing: "Send by end of this week",
-      source_note: "Networking with recent hires is a high-signal recruiting move.",
-      confidence: 0.75,
-    },
-    {
-      title: `Build a mini project showcasing ${role} skills`,
-      type: "proof_of_work",
-      company: null,
-      person: null,
-      fit_reason: `A tangible artifact demonstrates your skills better than any resume bullet and gives you something concrete to reference in outreach.`,
-      suggested_action: `Pick one small project idea and timebox 2 hours to build a working prototype or write-up you can share.`,
-      outreach_draft: "",
-      proof_of_work_idea: `Create a short case study or prototype relevant to ${role}. For example, if targeting product roles, write a 1-page product tear-down. If targeting engineering, build a small tool or script that solves a real problem you've encountered.`,
-      follow_up_timing: "Complete within 3 days",
-      source_note: "Proof-of-work artifacts give you something tangible to share in outreach.",
-      confidence: 0.8,
-    },
-  ];
-}
-
 export async function generateRecruitingMoves(
   profile: Profile,
   agentContext?: AgentContext
@@ -117,8 +69,7 @@ export async function generateRecruitingMoves(
   const apiKey = getAnthropicApiKey();
 
   if (!apiKey) {
-    console.warn("[koda:generateMoves] No ANTHROPIC_API_KEY — falling back to mock moves.");
-    return generateMockMoves(profile);
+    throw new Error("ANTHROPIC_API_KEY is required for move generation");
   }
 
   const anthropic = new Anthropic({ apiKey });
@@ -142,8 +93,7 @@ export async function generateRecruitingMoves(
     const moves: unknown[] = Array.isArray(parsed) ? parsed : [];
 
     if (moves.length === 0) {
-      console.warn("[koda:generateMoves] LLM returned empty moves array — falling back to mock moves.");
-      return generateMockMoves(profile);
+      throw new Error("Move generation returned no results");
     }
 
     return moves.map((move) => {
@@ -152,8 +102,7 @@ export async function generateRecruitingMoves(
       }
       return sanitizeMove(move as Record<string, unknown>);
     });
-  } catch {
-    console.warn("[koda:generateMoves] Failed to parse LLM response — falling back to mock moves.");
-    return generateMockMoves(profile);
+  } catch (error) {
+    throw error;
   }
 }
