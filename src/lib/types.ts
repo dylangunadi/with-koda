@@ -8,10 +8,12 @@ export interface Profile {
   target_companies: string[];
   industries: string[];
   locations: string[];
+  company_size: string | null;
   work_auth: string | null;
   resume_text: string | null;
+  experience_summary: string | null;
   linkedin_url: string | null;
-  contacts_notes: string | null;
+  focus_options: string[];
   semester_goal: string | null;
   autonomous_enabled: boolean;
   brief_frequency: string;

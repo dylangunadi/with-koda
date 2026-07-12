@@ -34,11 +34,12 @@ export default function SettingsPage() {
     target_companies: "",
     industries: "",
     locations: "",
+    company_size: "",
     work_auth: "",
     resume_text: "",
     linkedin_url: "",
+    focus_options: [] as string[],
     semester_goal: "",
-    contacts_notes: "",
     autonomous_enabled: false,
     brief_frequency: "daily",
     brief_email: "",
@@ -71,11 +72,12 @@ export default function SettingsPage() {
           target_companies: (data.target_companies ?? []).join(", "),
           industries: (data.industries ?? []).join(", "),
           locations: (data.locations ?? []).join(", "),
+          company_size: data.company_size ?? "",
           work_auth: data.work_auth ?? "",
           resume_text: data.resume_text ?? "",
           linkedin_url: data.linkedin_url ?? "",
+          focus_options: data.focus_options ?? [],
           semester_goal: data.semester_goal ?? "",
-          contacts_notes: data.contacts_notes ?? "",
           autonomous_enabled: data.autonomous_enabled ?? false,
           brief_frequency: data.brief_frequency ?? "daily",
           brief_email: data.brief_email ?? "",
@@ -98,7 +100,13 @@ export default function SettingsPage() {
     setSuccess(false)
     setSaving(true)
     try {
-      await saveProfile(form)
+      const splitCommas = (s: string) => s.split(",").map(v => v.trim()).filter(Boolean)
+      await saveProfile({
+        ...form,
+        target_roles: splitCommas(form.target_roles),
+        industries: splitCommas(form.industries),
+        locations: splitCommas(form.locations),
+      })
       setSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
@@ -287,18 +295,6 @@ export default function SettingsPage() {
                 rows={4}
                 className="rounded-lg"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="contacts_notes">Existing Contacts</Label>
-              <Textarea
-                id="contacts_notes"
-                placeholder="Anyone you already know in the industry?"
-                value={form.contacts_notes}
-                onChange={(e) => update("contacts_notes", e.target.value)}
-                rows={3}
-                className="rounded-lg"
-              />
-              <p className="text-xs text-muted-foreground">Optional</p>
             </div>
           </div>
         </div>

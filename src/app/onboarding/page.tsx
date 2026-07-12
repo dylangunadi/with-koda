@@ -105,18 +105,16 @@ export default function OnboardingPage() {
         name: form.name,
         school: form.school,
         year: form.year,
-        target_roles: form.target_roles.join(", "),
+        target_roles: form.target_roles,
         target_companies: form.target_companies,
-        industries: form.industries.join(", "),
-        locations: form.locations.join(", "),
+        industries: form.industries,
+        locations: form.locations,
+        company_size: form.company_size,
         work_auth: form.work_auth,
         resume_text: form.resume_text,
         linkedin_url: form.linkedin_url,
-        semester_goal: form.focus.length > 0
-          ? form.focus.map(f => FOCUS_OPTIONS.find(o => o.value === f)?.label).filter(Boolean).join(". ") +
-            (form.semester_goal ? ". " + form.semester_goal : "")
-          : form.semester_goal,
-        contacts_notes: "",
+        focus_options: form.focus,
+        semester_goal: form.semester_goal,
       })
       router.push("/inbox")
     } catch (err) {

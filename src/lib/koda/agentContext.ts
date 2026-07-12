@@ -73,7 +73,7 @@ function extractFeedbackPatterns(
   if (editedEvents.length > 3) {
     toneSignals.push("User frequently edits outreach drafts — keep tone closer to casual and concise.");
   }
-  if (sent.length > 0 && (accepted.length + sent.length) > sent.length * 3) {
+  if (sent.length > 0 && accepted.length > sent.length) {
     toneSignals.push("User accepts more moves than they send — they may be selective about outreach timing.");
   }
 

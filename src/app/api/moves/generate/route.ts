@@ -4,6 +4,8 @@ import { generateRecruitingMoves } from "@/lib/koda/generateRecruitingMoves";
 import { buildAgentContext } from "@/lib/koda/agentContext";
 import type { Profile } from "@/lib/types";
 
+const RATE_LIMIT_MINUTES = 2;
+
 export async function POST() {
   const supabase = await createClient();
 
@@ -14,6 +16,22 @@ export async function POST() {
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit: check if moves were generated in the last N minutes
+  const cutoff = new Date(Date.now() - RATE_LIMIT_MINUTES * 60 * 1000).toISOString();
+  const { data: recentMoves } = await supabase
+    .from("recruiting_moves")
+    .select("id")
+    .eq("user_id", user.id)
+    .gte("created_at", cutoff)
+    .limit(1);
+
+  if (recentMoves && recentMoves.length > 0) {
+    return NextResponse.json(
+      { error: `Please wait at least ${RATE_LIMIT_MINUTES} minutes between generations.` },
+      { status: 429 }
+    );
   }
 
   const { data: profile, error: profileError } = await supabase

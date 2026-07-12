@@ -63,9 +63,9 @@ function sanitizeMove(move: Record<string, unknown>): GeneratedMove {
 }
 
 export function generateMockMoves(profile: Profile): GeneratedMove[] {
-  const role = profile.target_roles[0] || "Software Engineer";
-  const company = profile.target_companies[0] || "a top tech company";
-  const secondCompany = profile.target_companies[1] || "a growth-stage startup";
+  const role = (profile.target_roles ?? [])[0] || "Software Engineer";
+  const company = (profile.target_companies ?? [])[0] || "a top tech company";
+  const secondCompany = (profile.target_companies ?? [])[1] || "a growth-stage startup";
 
   return [
     {

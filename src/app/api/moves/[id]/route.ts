@@ -2,11 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { MoveEventType } from "@/lib/types";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const STATUS_TO_EVENT: Record<string, MoveEventType> = {
+  generated: "generated",
+  accepted: "accepted",
+  rejected: "rejected",
+  sent: "sent",
+  saved: "saved",
+};
+
+const MAX_DRAFT_LENGTH = 10000;
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  if (!UUID_REGEX.test(id)) {
+    return NextResponse.json({ error: "Invalid move ID" }, { status: 400 });
+  }
+
   const supabase = await createClient();
 
   const {
@@ -29,10 +46,18 @@ export async function PATCH(
     outreach_draft?: string;
   };
 
-  // Verify the move belongs to the authenticated user
+  // Validate outreach_draft length
+  if (outreach_draft !== undefined && outreach_draft.length > MAX_DRAFT_LENGTH) {
+    return NextResponse.json(
+      { error: `Outreach draft too long (max ${MAX_DRAFT_LENGTH} characters)` },
+      { status: 400 }
+    );
+  }
+
+  // Verify the move exists and belongs to the user (RLS enforces ownership)
   const { data: existing, error: fetchError } = await supabase
     .from("recruiting_moves")
-    .select("id, user_id")
+    .select("id")
     .eq("id", id)
     .single();
 
@@ -40,12 +65,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Move not found" }, { status: 404 });
   }
 
-  if (existing.user_id !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   // Validate status if provided
-  const VALID_STATUSES = ["generated", "accepted", "rejected", "sent", "saved"];
+  const VALID_STATUSES = Object.keys(STATUS_TO_EVENT);
   if (status && !VALID_STATUSES.includes(status)) {
     return NextResponse.json(
       { error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` },
@@ -80,12 +101,10 @@ export async function PATCH(
     );
   }
 
-  // Determine event type
+  // Determine event type using explicit mapping
   let eventType: MoveEventType;
-  if (status) {
-    eventType = status as MoveEventType;
-  } else if (outreach_draft !== undefined) {
-    eventType = "edited";
+  if (status && STATUS_TO_EVENT[status]) {
+    eventType = STATUS_TO_EVENT[status];
   } else {
     eventType = "edited";
   }

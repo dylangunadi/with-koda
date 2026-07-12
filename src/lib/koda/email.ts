@@ -61,7 +61,7 @@ function buildBriefHtml(
         <td style="padding: 16px; border-bottom: 1px solid #eee;">
           <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">${escapeHtml(m.title)}</div>
           ${m.company ? `<div style="font-size: 13px; color: #666;">${escapeHtml(m.company)}</div>` : ""}
-          <div style="font-size: 13px; color: #888; margin-top: 8px;">${escapeHtml(m.fit_reason)}</div>
+          <div style="font-size: 13px; color: #888; margin-top: 8px;">${escapeHtml(m.fit_reason || "")}</div>
           ${m.source_note ? `<div style="font-size: 12px; color: #0d7377; margin-top: 6px; font-style: italic;">Why this move: ${escapeHtml(m.source_note)}</div>` : ""}
         </td>
       </tr>`

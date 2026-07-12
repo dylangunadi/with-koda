@@ -106,16 +106,22 @@ export async function GET(request: NextRequest) {
           metadata: { source: "autonomous_brief" },
         }));
 
-        await supabase.from("move_events").insert(events);
+        const { error: eventsError } = await supabase.from("move_events").insert(events);
+        if (eventsError) {
+          console.warn(`[cron:brief] Failed to insert move_events for user ${profile.user_id}:`, eventsError.message);
+        }
       }
 
       // Send email digest if user has an email set
       if (profile.brief_email) {
-        await sendBriefEmail({
+        const emailResult = await sendBriefEmail({
           to: profile.brief_email,
           userName: profile.name || "there",
           moves,
         });
+        if (!emailResult.sent) {
+          console.warn(`[cron:brief] Email not delivered for user ${profile.user_id} (method: ${emailResult.method})`);
+        }
       }
 
       results.push({ userId: profile.user_id, success: true });

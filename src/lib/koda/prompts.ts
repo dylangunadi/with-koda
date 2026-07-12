@@ -39,20 +39,39 @@ export function buildUserPrompt(
   if (profile.school) parts.push(`School: ${profile.school}`);
   if (profile.year) parts.push(`Year: ${profile.year}`);
 
-  if (profile.target_roles.length > 0) {
-    parts.push(`Target roles: ${profile.target_roles.join(", ")}`);
+  const targetRoles = profile.target_roles ?? [];
+  if (targetRoles.length > 0) {
+    parts.push(`Target roles: ${targetRoles.join(", ")}`);
   }
-  if (profile.target_companies.length > 0) {
-    parts.push(`Target companies: ${profile.target_companies.join(", ")}`);
+  const targetCompanies = profile.target_companies ?? [];
+  if (targetCompanies.length > 0) {
+    parts.push(`Target companies: ${targetCompanies.join(", ")}`);
   }
-  if (profile.industries.length > 0) {
-    parts.push(`Industries: ${profile.industries.join(", ")}`);
+  const industries = profile.industries ?? [];
+  if (industries.length > 0) {
+    parts.push(`Industries: ${industries.join(", ")}`);
   }
-  if (profile.locations.length > 0) {
-    parts.push(`Preferred locations: ${profile.locations.join(", ")}`);
+  const locations = profile.locations ?? [];
+  if (locations.length > 0) {
+    parts.push(`Preferred locations: ${locations.join(", ")}`);
   }
-  if (profile.resume_text) {
+  if (profile.company_size) {
+    parts.push(`Company size preference: ${profile.company_size}`);
+  }
+  if (profile.work_auth) {
+    parts.push(`Work authorization: ${profile.work_auth}`);
+  }
+  if (profile.linkedin_url) {
+    parts.push(`LinkedIn: ${profile.linkedin_url}`);
+  }
+  if (profile.experience_summary) {
+    parts.push(`\nExperience summary:\n${profile.experience_summary}`);
+  } else if (profile.resume_text) {
     parts.push(`\nResume:\n${profile.resume_text}`);
+  }
+  const focusOptions = profile.focus_options ?? [];
+  if (focusOptions.length > 0) {
+    parts.push(`\nFocus areas: ${focusOptions.join(", ")}`);
   }
   if (profile.semester_goal) {
     parts.push(`\nSemester goal: ${profile.semester_goal}`);
