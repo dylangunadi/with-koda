@@ -1,5 +1,32 @@
 # TODOS — Koda
 
+## NOW: Guided first action
+
+Status: ready
+
+Goal:
+A new user completes one meaningful Koda action within three minutes.
+
+Acceptance criteria:
+- New user sees one obvious primary action.
+- The flow has loading, empty and error states.
+- User input survives a failed AI request.
+- Completing the action updates relationship state.
+- Relevant Playwright test passes.
+- scripts/validate.sh passes.
+
+Out of scope:
+- New contact-management system
+- Broad dashboard redesign
+- Changes to unrelated workflows
+
+Validation:
+- [ ] Running app exercised
+- [ ] Targeted Playwright test
+- [ ] Full validation
+- [ ] Codex review
+- [ ] Preview manually inspected
+
 ## Now
 
 - [x] Configure Playwright `baseURL` and `webServer` in `playwright.config.ts`
