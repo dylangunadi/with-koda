@@ -7,9 +7,8 @@
 --   prompts.ts reads it, but no prior migration created the column.
 -- * brief_frequency gains the conventional value 'manual' (text column, no DDL
 --   needed). Manual = autonomous_enabled false. Choosing Daily/Weekly during
---   onboarding review sets autonomous_enabled + brief_confirmed in-product;
---   email delivery still requires the separate email confirmation flow and
---   brief_email stays null until that flow completes.
+--   onboarding review sets autonomous_enabled only; brief_confirmed remains
+--   exclusively owned by the email double-opt-in flow (/api/briefs/confirm).
 -- * recruiting_moves gains nullable display fields only; existing rows and the
 --   legacy 'sent' status remain valid.
 
@@ -43,6 +42,11 @@ create index idx_briefs_user_created on briefs(user_id, created_at desc);
 create unique index idx_briefs_scheduled_once_per_day
   on briefs(user_id, brief_date)
   where source = 'scheduled';
+
+-- Onboarding produces exactly one first brief, even under concurrent confirms.
+create unique index idx_briefs_onboarding_once
+  on briefs(user_id)
+  where source = 'onboarding';
 
 -- =============================================================================
 -- 3. recruiting_moves — brief linkage and display fields

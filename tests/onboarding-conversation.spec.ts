@@ -47,16 +47,17 @@ test("@critical new user enters Talk to Koda, completes onboarding, gets a persi
 
   // Structured persistence (not just a transcript): extracted jsonb has fields.
   const db = adminClient();
-  const { data: preConv } = await db
+  const { data: allUsers } = await db.auth.admin.listUsers({ perPage: 200 });
+  const testUser = allUsers.users.find((u) => u.email === email);
+  expect(testUser).toBeTruthy();
+  const { data: mine } = await db
     .from("koda_conversations")
     .select("extracted,status")
+    .eq("user_id", testUser!.id)
     .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(5);
-  const mine = (preConv ?? []).find(
-    (c) => (c.extracted as Record<string, unknown>).name === "Jordan"
-  );
+    .single();
   expect(mine, "extracted onboarding state persisted as structured fields").toBeTruthy();
+  expect((mine!.extracted as Record<string, unknown>).name).toBe("Jordan");
   expect((mine!.extracted as Record<string, unknown>).target_roles).toEqual([
     "Product management",
     "growth roles",
@@ -74,7 +75,8 @@ test("@critical new user enters Talk to Koda, completes onboarding, gets a persi
 
   // Edit a field and pick a schedule.
   await page.getByLabel("Target companies (comma separated)").fill("Notion, Linear, Anthropic, Figma");
-  await page.getByRole("radio", { name: /Weekly brief/ }).click();
+  await page.getByText("Weekly brief", { exact: true }).click();
+  await expect(page.getByRole("radio", { name: /Weekly brief/ })).toBeChecked();
   await page.getByRole("button", { name: "Confirm and build my first brief" }).click();
 
   // 6. First brief lands in the inbox: exactly three moves.

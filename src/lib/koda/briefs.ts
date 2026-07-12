@@ -4,8 +4,8 @@ import type { GeneratedMove } from "@/lib/koda/ai/provider";
 
 /**
  * Persist a brief and its generated moves as one unit.
- * Every generation path (onboarding, manual, scheduled) goes through here so
- * moves are always attached to a first-class brief row.
+ * Onboarding and manual generation go through here; the scheduled cron path
+ * still writes bare moves and is migrated separately.
  */
 export async function insertBriefWithMoves(
   supabase: SupabaseClient,

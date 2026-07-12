@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { missingFields, ONBOARDING_FIELDS } from "@/lib/koda/onboarding";
+import { isMockMode } from "@/lib/koda/ai/provider";
 import { TalkToKoda } from "@/components/talk/TalkToKoda";
 import type { KodaConversation, KodaMessage, OnboardingExtracted } from "@/lib/types";
 
@@ -61,6 +62,7 @@ export default async function TalkPage() {
       initialMissing={missing}
       firstQuestion={firstQuestion}
       totalFields={ONBOARDING_FIELDS.length}
+      initialAiMode={isMockMode() ? "mock" : "live"}
     />
   );
 }

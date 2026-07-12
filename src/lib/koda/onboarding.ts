@@ -90,8 +90,9 @@ export function onboardingDone(extracted: OnboardingExtracted): boolean {
 }
 
 /**
- * Merge an extraction delta into existing state. Additive only: a turn can add
- * or refine fields but never clears one, so nothing the user said is lost.
+ * Merge an extraction delta into existing state. A turn can add a field or
+ * replace its value with a new non-empty one, but can never empty a field,
+ * so an answered question never becomes unanswered.
  */
 export function mergeExtracted(
   current: OnboardingExtracted,

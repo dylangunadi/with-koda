@@ -28,5 +28,11 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    env: {
+      ...process.env,
+      // Specs assert the deterministic offline provider; never let a test run
+      // hit the live model API.
+      KODA_AI_MOCK: '1',
+    },
   },
 });

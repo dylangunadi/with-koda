@@ -7,7 +7,16 @@ let admin: SupabaseClient | null = null;
 export function adminClient(): SupabaseClient {
   if (!admin) {
     const env = testEnv();
-    admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    const url = env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const host = url ? new URL(url).hostname : "";
+    const isLocal = host === "127.0.0.1" || host === "localhost";
+    if (!isLocal && process.env.KODA_ALLOW_REMOTE_TEST_DB !== "1") {
+      throw new Error(
+        `Refusing to run service-role test helpers against non-local Supabase (${host}). ` +
+          "Tests seed and delete data. Set KODA_ALLOW_REMOTE_TEST_DB=1 only for a dedicated test project."
+      );
+    }
+    admin = createClient(url, env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
   }

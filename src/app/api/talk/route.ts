@@ -140,7 +140,7 @@ export async function POST(request: Request) {
     );
   }
 
-  await supabase.from("koda_messages").insert({
+  const { error: replyError } = await supabase.from("koda_messages").insert({
     conversation_id: conversation.id,
     user_id: user.id,
     role: "koda",
@@ -153,8 +153,15 @@ export async function POST(request: Request) {
     .from("koda_conversations")
     .update({ extracted: merged, updated_at: new Date().toISOString() })
     .eq("id", conversation.id);
-  if (convUpdateError) {
-    console.error("Failed to persist extracted state:", convUpdateError);
+
+  // If the reply or the extracted state failed to persist, do not pretend the
+  // turn succeeded: reported progress must never regress on reload.
+  if (replyError || convUpdateError) {
+    console.error("Failed to persist turn:", replyError ?? convUpdateError);
+    return NextResponse.json(
+      { error: "Could not save Koda's reply. Try again.", retryable: true },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({

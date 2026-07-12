@@ -139,25 +139,30 @@ export function ReviewConfirm({ extracted, onDone }: ReviewConfirmProps) {
 
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">How often should Koda run?</p>
-        <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Brief frequency">
+        <fieldset className="grid gap-2 sm:grid-cols-3">
+          <legend className="sr-only">Brief frequency</legend>
           {FREQUENCIES.map((f) => (
-            <button
+            <label
               key={f.value}
-              type="button"
-              role="radio"
-              aria-checked={frequency === f.value}
-              onClick={() => setFrequency(f.value)}
-              className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+              className={`cursor-pointer rounded-lg border px-3 py-2.5 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary ${
                 frequency === f.value
                   ? "border-primary bg-accent"
                   : "border-border hover:border-primary/40"
               }`}
             >
+              <input
+                type="radio"
+                name="brief-frequency"
+                value={f.value}
+                checked={frequency === f.value}
+                onChange={() => setFrequency(f.value)}
+                className="sr-only"
+              />
               <span className="block text-sm font-medium text-foreground">{f.label}</span>
               <span className="mt-0.5 block text-xs text-muted-foreground">{f.hint}</span>
-            </button>
+            </label>
           ))}
-        </div>
+        </fieldset>
         <p className="text-xs text-muted-foreground">
           Scheduled briefs stay inside Koda. Email delivery is set up separately in Settings.
         </p>

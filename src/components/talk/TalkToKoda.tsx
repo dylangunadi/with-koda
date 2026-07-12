@@ -18,6 +18,7 @@ interface TalkToKodaProps {
   initialMissing: string[];
   firstQuestion: string;
   totalFields: number;
+  initialAiMode: "live" | "mock";
 }
 
 const GREETING =
@@ -29,6 +30,7 @@ export function TalkToKoda({
   initialMissing,
   firstQuestion,
   totalFields,
+  initialAiMode,
 }: TalkToKodaProps) {
   const router = useRouter();
   const resumed = initialMessages.length > 0;
@@ -54,7 +56,7 @@ export function TalkToKoda({
   const [extracted, setExtracted] = useState<OnboardingExtracted>(initialExtracted);
   const [missing, setMissing] = useState<string[]>(initialMissing);
   const [done, setDone] = useState(initialMissing.length === 0);
-  const [aiMode, setAiMode] = useState<string | null>(null);
+  const [aiMode, setAiMode] = useState<string>(initialAiMode);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -85,7 +87,7 @@ export function TalkToKoda({
       setMessages((prev) => [...prev, { role: "koda", content: data.reply }]);
       setExtracted(data.extracted ?? {});
       setMissing(data.missing ?? []);
-      setAiMode(data.aiMode ?? null);
+      if (data.aiMode) setAiMode(data.aiMode);
       if (data.done) setDone(true);
     } catch {
       setMessages((prev) => prev.slice(0, -1));
@@ -122,7 +124,10 @@ export function TalkToKoda({
       </header>
 
       <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-2xl px-6 py-8 space-y-6 page-enter">
+        <div
+          className="mx-auto max-w-2xl px-6 py-8 space-y-6 page-enter"
+          aria-live="polite"
+        >
           {resumed && (
             <p className="font-system text-muted-foreground text-center">
               Resumed. Nothing you said was lost.

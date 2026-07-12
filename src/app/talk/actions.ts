@@ -96,12 +96,11 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
     contacts_notes: clean(review.contacts, 1000),
     proof_points: clean(review.proof_points, 1000),
     success_definition: clean(review.success_definition, 500),
-    // Daily/Weekly chosen at review is an explicit in-product confirmation of
-    // scheduled briefs. Email delivery stays off until the separate email
-    // confirmation flow sets brief_email.
+    // Daily/Weekly chosen at review consents to in-app scheduled briefs
+    // (autonomous_enabled). brief_confirmed stays false: that flag belongs to
+    // the email double-opt-in flow and is only set by /api/briefs/confirm.
     brief_frequency: frequency,
     autonomous_enabled: frequency !== "manual",
-    brief_confirmed: frequency !== "manual",
     updated_at: new Date().toISOString(),
   };
 
@@ -138,6 +137,19 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
     });
     return { success: true, briefId: brief.id };
   } catch (err) {
+    // A concurrent confirm may have won the onboarding-brief unique index;
+    // that is success, not failure — return the existing brief.
+    if (err instanceof Error && /23505|duplicate key/.test(err.message)) {
+      const { data: racedBrief } = await supabase
+        .from("briefs")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("source", "onboarding")
+        .maybeSingle();
+      if (racedBrief) {
+        return { success: true, briefId: (racedBrief as Brief).id };
+      }
+    }
     console.error("First brief generation failed:", err);
     return {
       success: true,
