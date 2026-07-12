@@ -65,10 +65,15 @@ function extractForField(
       return { timeline: firstSentence(text, 200) };
     case "locations": {
       const authPattern = /visa|sponsor|citizen|authoriz|\bopt\b|\bcpt\b|international/i;
-      const locations = splitList(text).filter((item) => !authPattern.test(item));
+      const parts = splitList(text);
+      const locations = parts.filter((item) => !authPattern.test(item));
       const delta: Partial<OnboardingExtracted> = { locations };
-      if (authPattern.test(text)) {
-        delta.work_auth = firstSentence(text, 160);
+      const authParts = text
+        .split(/,|;/)
+        .map((s) => s.trim())
+        .filter((s) => authPattern.test(s));
+      if (authParts.length) {
+        delta.work_auth = authParts.join(", ").slice(0, 160);
       }
       if (!delta.locations || delta.locations.length === 0) delta.locations = [firstSentence(text, 80)];
       return delta;
