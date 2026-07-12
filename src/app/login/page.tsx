@@ -35,7 +35,18 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      router.push("/inbox")
+      // Check if user has a profile — if so, go to inbox; otherwise onboarding
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .single()
+        router.push(profile ? "/inbox" : "/onboarding")
+      } else {
+        router.push("/inbox")
+      }
     } else {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -129,38 +140,6 @@ export default function LoginPage() {
             className="rounded-xl border border-border bg-card shadow-sm p-8 page-enter"
             style={{ animationDelay: "120ms" }}
           >
-            {/* Mode toggle */}
-            <div className="flex items-center rounded-lg bg-secondary/60 p-1 mb-8">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signin")
-                  setError(null)
-                }}
-                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-                  mode === "signin"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Sign in
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signup")
-                  setError(null)
-                }}
-                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-                  mode === "signup"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Sign up
-              </button>
-            </div>
-
             {/* Heading */}
             <div className="mb-6">
               <h2 className="text-xl font-heading font-semibold text-foreground">
@@ -168,8 +147,8 @@ export default function LoginPage() {
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {mode === "signin"
-                  ? "Sign in with your email and password"
-                  : "Enter your details to get started"}
+                  ? "Sign in to see your recruiting brief."
+                  : "Enter your details to get started."}
               </p>
             </div>
 
@@ -228,10 +207,37 @@ export default function LoginPage() {
                       : "Creating account..."
                     : mode === "signin"
                       ? "Sign In"
-                      : "Sign Up"}
+                      : "Create Account"}
                 </Button>
               </div>
             </form>
+
+            {/* Mode switch */}
+            <div className="mt-6 text-center text-sm text-muted-foreground">
+              {mode === "signin" ? (
+                <>
+                  New to Koda?{" "}
+                  <button
+                    type="button"
+                    onClick={() => { setMode("signup"); setError(null) }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Create an account
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => { setMode("signin"); setError(null) }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </div>
           </div>}
 
           {/* Footer tagline */}

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -66,6 +67,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(true)
 
   const [form, setForm] = useState({
     name: "",
@@ -82,6 +84,29 @@ export default function OnboardingPage() {
     semester_goal: "",
     focus: [] as string[],
   })
+
+  useEffect(() => {
+    async function checkProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setChecking(false)
+        return
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single()
+      if (profile) {
+        // Returning user already has a profile — send to inbox
+        router.replace("/inbox")
+        return
+      }
+      setChecking(false)
+    }
+    checkProfile()
+  }, [router])
 
   function update(field: string, value: string | string[]) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -121,6 +146,18 @@ export default function OnboardingPage() {
       setError(err instanceof Error ? err.message : "Something went wrong")
       setLoading(false)
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="grain fixed inset-0 pointer-events-none" />
+        <div className="flex items-center gap-3">
+          <div className="status-dot" />
+          <p className="text-muted-foreground font-system">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
