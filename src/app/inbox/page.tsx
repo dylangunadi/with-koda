@@ -1,10 +1,13 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { RecruitingMove } from "@/lib/types";
+import type { Brief, RecruitingMove } from "@/lib/types";
 import { GenerateMovesButton } from "@/components/GenerateMovesButton";
 import { InboxTabs } from "@/components/InboxTabs";
+import { BriefHeader } from "@/components/BriefHeader";
+import { MessageCircle } from "lucide-react";
 
 export default async function InboxPage() {
   const supabase = await createClient();
@@ -24,7 +27,7 @@ export default async function InboxPage() {
     .single();
 
   if (!profile) {
-    redirect("/onboarding");
+    redirect("/talk");
   }
 
   const { data: moves } = await supabase
@@ -33,11 +36,23 @@ export default async function InboxPage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
+  const { data: latestBrief } = await supabase
+    .from("briefs")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const allMoves = (moves ?? []) as RecruitingMove[];
+  const brief = latestBrief as Brief | null;
+  const briefMoveCount = brief
+    ? allMoves.filter((m) => m.brief_id === brief.id).length
+    : 0;
 
   return (
     <div className="page-enter space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <p className="font-system text-primary mb-2">Agent inbox</p>
           <h1 className="text-2xl font-heading font-bold tracking-tight text-foreground">Your Moves</h1>
@@ -45,8 +60,21 @@ export default async function InboxPage() {
             Today&apos;s recruiting actions, curated by Koda.
           </p>
         </div>
-        <GenerateMovesButton />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/talk"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[#075B59]"
+          >
+            <MessageCircle className="size-4" />
+            Talk to Koda
+          </Link>
+          <GenerateMovesButton />
+        </div>
       </div>
+
+      {brief && briefMoveCount > 0 && (
+        <BriefHeader brief={brief} moveCount={briefMoveCount} />
+      )}
 
       <InboxTabs moves={allMoves} />
     </div>

@@ -28,6 +28,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="flex items-center gap-4">
             <Link
+              href="/talk"
+              className={`font-system transition-colors ${
+                pathname.startsWith("/talk")
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Talk to Koda
+            </Link>
+            <Link
               href="/settings"
               className={`font-system transition-colors ${
                 pathname.startsWith("/settings")

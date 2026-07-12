@@ -43,7 +43,7 @@ export default function LoginPage() {
           .select("id")
           .eq("user_id", user.id)
           .single()
-        router.push(profile ? "/inbox" : "/onboarding")
+        router.push(profile ? "/inbox" : "/talk")
       } else {
         router.push("/inbox")
       }
@@ -64,7 +64,7 @@ export default function LoginPage() {
         setConfirmationSent(true)
         return
       }
-      router.push("/onboarding")
+      router.push("/talk")
     }
   }
 
