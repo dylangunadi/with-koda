@@ -71,13 +71,13 @@ first visit → signup → conversational onboarding (text); mid-conversation re
 
 All executed in this sandbox with the local stack (section 14):
 
-| Command | Result |
-|---|---|
-| `npm run lint` | pass (0 problems) |
-| `npx tsc --noEmit` | pass |
-| `npm run build` | pass (production build) |
-| `npx playwright test --project=chromium` | **19/19 pass** (final full run; one earlier full run had a single parallel-load flake in the repeated-confirm spec, rerun green, waits widened) |
-| `bash scripts/validate.sh` | pass — see final-run note in section 16 |
+| Command | Exit | Result |
+|---|---|---|
+| `npm run lint` | 0 | pass (0 problems) |
+| `npx tsc --noEmit` | 0 | pass |
+| `npm run build` | 0 | pass (production build) |
+| `npx playwright test --project=chromium` | 0 | **21/21 pass** (final run; one earlier full run had a single parallel-load flake in the repeated-confirm spec, rerun green, waits widened) |
+| `bash scripts/validate.sh` | 0 | pass, including all 21 Playwright tests (requires `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium` in this sandbox; see note below) |
 
 Note: `validate.sh` skips Playwright because it checks `node_modules/playwright-core/.local-browsers`, which does not exist when browsers are provided via `PLAYWRIGHT_BROWSERS_PATH` (this sandbox). Tests were run directly; the sandbox additionally needs `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium` because the pinned Playwright wants Chromium r1228 and only r1194 is cached (downloads are policy-blocked). The config hook is a no-op when the variable is unset.
 
@@ -87,20 +87,29 @@ Note: `validate.sh` skips Playwright because it checks `node_modules/playwright-
 
 **Round 1** (after Tier 1): 0 blockers, 3 high, 5 medium, 5 low. Highlights: H1 dead `/talk` links for onboarded users; H2 `brief_confirmed` repurposing risked emailing unverified addresses; H3 briefs model claimed coverage it did not have; M1 confirm race could duplicate onboarding briefs; M2 tests could hit the live model; M3 swallowed persistence errors; M4 test helpers could write to a hosted project; M5 a11y gaps.
 
-**Round 2** (after Tier 3): see `.agent/reviews/independent-review-round-2.md` — disposition of round-1 findings plus new-surface findings, and section 11/12 below.
+**Round 2** (after Tier 3): 0 blockers, 1 high, 3 medium, 7 low. Highlights: H1 settings still ran the old consent model (any profile save could silently revoke scheduled-brief consent, then 400); M1 conversation history windows loaded oldest-first and froze after ~15 turns; M2 proposal confirmation was read-then-write (double-apply race, and a lost status write returned `applied: true` while leaving the card pending); M3 the duplicate guard could echo a stale reply on the retry-after-persist-failure path; L1-L7 smaller items (see section 12). Round 2 also confirmed round-1 findings H1, H3, M1-M5, L2, L4, L5 fixed. Full report: `.agent/reviews/independent-review-round-2.md`.
 
 ## 11. Fixes applied
 
 Round 1: H2 (consent split: `brief_confirmed` left to the email flow; cron gates in-app generation on `autonomous_enabled` + frequency and email on `brief_email && brief_confirmed`); H3 partially at Tier 1 (manual generation joined the briefs model) and fully at Tier 3 (cron); M1 (partial unique index + race-safe confirm); M2 (`KODA_AI_MOCK=1` pinned in the Playwright web server env); M3 (persist failures now return retryable errors); M4 (service-role helpers refuse non-local Supabase unless explicitly overridden); M5 (aria-live transcript, native radio inputs); L1/L4/L5 (docstring, first-paint offline chip, user-scoped test probe). H1 was resolved by Tier 3 itself: `/talk` is now a real ongoing conversation for onboarded users. L2 resolved by the Tier 2 action-semantics rework.
 
-Round 2 fixes: listed at the end of section 12 after verification.
+Round 2 fixes (commit `8765a57`): **H1** — settings no longer routes brief consent through profile saves; `saveProfile` drops brief fields entirely and `/api/briefs` owns the full consent split (enable without email = in-app briefs only; new/changed email = pending until the confirmation link; disable = back to manual), covered by the new `tests/settings-briefs.spec.ts` asserting database truth. **M1** — conversation history and transcript loads are newest-first windows. **M2** — proposal confirmation claims its resolution before applying effects, reverts on failure, and dedupes relationship inserts by source message id. **M3** — the duplicate guard requires the matched reply to be newer than the user message, so retries after mid-persist failures run instead of echoing the stale turn. **L1** — completed moves feed feedback patterns and recent-move prompts like accepted ones. Plus, from the final browser walkthrough: date-only display of follow-up dates in next-move replies (commit `911933a`).
+
+A note on the settings specs: their first versions synchronized on `getByText(/saved|updated/i)`, which matched static page copy ("Keep this updated...") and therefore tore the page down mid-save, aborting in-flight requests. The specs now wait for the exact "Profile saved successfully." state. The investigation also produced two real robustness fixes that stand regardless (body-parse guard in `/api/briefs`, non-JSON error tolerance in the settings client).
 
 ## 12. Rejected findings and rationale
 
-- Round 1, L3 (RLS on `koda_messages` does not verify conversation ownership): accepted-as-low and deferred. Rows are strictly user-scoped (`auth.uid() = user_id` on every policy), so no cross-user exposure exists; the residual risk is a user attaching messages to their own conversation ids only.
-- Round 1's observation that the returning-user test "enshrined" the redirect loop: the test asserted the interim Tier 1 behavior and was updated when Tier 3 made `/talk` real, as planned.
+Round 1:
+- L3 (RLS on `koda_messages` does not verify conversation ownership): accepted-as-low. Rows are strictly user-scoped (`auth.uid() = user_id` on every policy), so no cross-user exposure exists; the residual risk is a user attaching messages to their own conversation ids only.
+- The observation that the returning-user test "enshrined" the redirect loop: the test asserted the interim Tier 1 behavior and was updated when Tier 3 made `/talk` real, as planned.
 
-(Final disposition of round 2 findings recorded after verification below.)
+Round 2 low findings, dispositions:
+- **L2** (koda_events RLS lets a browser insert events directly, bypassing the `/api/events` whitelist): accepted-as-low. A user can only forge or delete rows in their own analytics partition; funnel metrics tolerate self-pollution. Tightening would require moving all event writes behind service-role routes.
+- **L3** (koda_messages conversation-ownership residual): same disposition as round 1.
+- **L4** (`mergeExtracted` replaces list fields): rejected — intentional behavior. Restating "my target companies are X, Y" is an update, not an append; the docstring states the real contract (replace allowed, emptying never), and the review screen lets users fix anything.
+- **L5** (`KODA_AI_MOCK=1` web-server pin does not govern an already-running reused dev server): documented. CI starts a fresh pinned server; locally, run the dev server with `KODA_AI_MOCK=1` (as `.env.local` does here) before running specs.
+- **L6** (fire-and-forget event logging can drop events on serverless termination and races test assertions): by design — logging must never break a product flow. Documented; the instrumentation spec's assertions run after full page flows, which has been reliable.
+- **L7** (the concurrent arm of the onboarding-confirm race has no direct test): accepted. The client guard and sequential-idempotency arms are tested; the unique index (`idx_briefs_onboarding_once`) plus the 23505 recovery branch cover the true-race arm structurally.
 
 ## 13. Known limitations
 
@@ -143,7 +152,9 @@ cbc8602 feat: ongoing talk to koda workflows
 bb0dc3d feat: idempotent scheduled briefs with clean consent split
 c50dcc7 feat: product instrumentation with privacy-safe event log
 983df8b test: widen waits in repeated-confirm spec against parallel-load flake
-(+ final close-out commits appended after review round 2)
+911933a fix: show date-only follow-up in next-move recommendation
+8765a57 fix: address review round 2 findings
+(+ final report commit)
 ```
 
 ## 16. Exact steps for Dylan in the morning
