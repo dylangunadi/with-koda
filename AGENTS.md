@@ -120,6 +120,8 @@ with-koda/
 - Do not refactor unrelated code during a focused task
 - Do not remove or weaken RLS policies
 - Do not bypass auth checks in API routes
+- Do not read or write `integration_tokens` outside `src/lib/koda/integrations/tokens.ts`, add policies/grants to that table, log token values, or import token/crypto modules into client components
+- Do not add any code path that sends messages, creates or edits calendar events, or performs outbound actions on a user's behalf — integration adapters stay pull-only
 
 ## Pull Request Expectations
 
@@ -132,7 +134,7 @@ with-koda/
 
 ## Definition of Done
 
-1. `scripts/validate.sh` passes (lint, types, build)
+1. `scripts/validate.sh` passes (lint, types, unit tests, build)
 2. Relevant user flow exercised in running app or browser test
 3. No regressions in existing functionality
 4. Code follows repository conventions

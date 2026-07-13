@@ -3,8 +3,8 @@
 ## Test Stack
 
 - **E2E / Browser**: Playwright (`@playwright/test`), chromium project
-- **Unit / Integration**: None configured yet (no Jest/Vitest)
-- **Config**: `playwright.config.ts` (baseURL `http://localhost:3000`, auto-starts `npm run dev` with `KODA_AI_MOCK=1`)
+- **Unit**: Vitest (`npm run test:unit`), node environment, scoped to `src/lib/koda/**/__tests__/` — crypto, normalizers, grounding/ref resolution, board parsing
+- **Config**: `playwright.config.ts` (baseURL `http://localhost:3000`, auto-starts `npm run dev` with `KODA_AI_MOCK=1`, `KODA_INTEGRATIONS_MOCK=1`, and a test-only `KODA_TOKEN_ENC_KEY`); `vitest.config.ts` (aliases `server-only` to a stub for plain-Node runs)
 
 ## Running Tests
 
@@ -18,7 +18,10 @@ npx playwright test tests/onboarding-conversation.spec.ts --project=chromium
 # Critical E2E only (@critical tag)
 bash scripts/e2e-critical.sh
 
-# Full validation (lint + types + build + tests)
+# Unit tests only
+npm run test:unit
+
+# Full validation (lint + types + unit tests + build + Playwright)
 bash scripts/validate.sh
 ```
 
@@ -38,6 +41,9 @@ In environments that cannot download the pinned Chromium build, point at a cache
 | `tests/cron-brief.spec.ts` | Scheduled brief idempotency, consent gating, manual users untouched, secret rejection (serial) |
 | `tests/settings-briefs.spec.ts` | Profile edits never revoke scheduled-brief consent; enable/disable round-trips |
 | `tests/instrumentation.spec.ts` | Activation event trail exists; no user content leaks into event properties |
+| `tests/integrations-connect.spec.ts` | @critical — mock-OAuth connect stores encrypted tokens an authed client cannot read (RLS proof); consent cancel writes nothing; disconnect cascades tokens and imported events |
+| `tests/integrations-sync.spec.ts` | Sync cron secret rejection and per-day idempotency; forced manual-sync failure recorded without crashing; rate limit; reconnect-needed UI state |
+| `tests/grounded-moves.spec.ts` | @critical — calendar-grounded move with Verified badge and live source link; completion prevents duplicate moves for the same event; board-grounded opportunity move; board removal deletes imports; no-integration users unchanged |
 | `tests/helpers/` | `env.ts` (.env.local parsing), `db.ts` (service-role seeding/assertions, refuses non-local Supabase), `auth.ts` (UI login/signup) |
 
 ## Test Data
@@ -51,6 +57,13 @@ In environments that cannot download the pinned Chromium build, point at a cache
 
 - The Playwright web server pins `KODA_AI_MOCK=1`, so specs run against the deterministic offline provider and never call the live model. If you reuse an already-running dev server, start it with `KODA_AI_MOCK=1` yourself.
 - AI failures are injected with the `x-koda-test-ai: fail` header (honored only in mock mode outside production; it can only cause failures). `/api/talk` streams; specs that parse it directly read the last `data:` frame.
+
+## Integrations in Tests
+
+- `KODA_INTEGRATIONS_MOCK=1` selects deterministic mock adapters (calendar events relative to "today", two stable postings per board) and short-circuits the Google consent screen through the real connect/callback routes.
+- Integration failures are injected with `x-koda-test-integration: fail` (mock mode outside production only).
+- The token vault is exercised for real: the Playwright web server sets a test-only `KODA_TOKEN_ENC_KEY`, and the connect spec asserts an authenticated client reads zero `integration_tokens` rows.
+- The real Google consent screen cannot be Playwright'd. Manual E2E against real Google (localhost or staging): set `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`KODA_TOKEN_ENC_KEY`, unset `KODA_INTEGRATIONS_MOCK`, then walk connect → sync → grounded brief → disconnect and verify the calendar rows appear and disappear.
 
 ## Authentication in Browser Tests
 

@@ -40,14 +40,19 @@ Students without inherited recruiting networks struggle to identify who to conta
 - Scheduled brief cron (daily at 8 AM UTC, weekly on Mondays), idempotent per user per day
 - Email digest via Resend (falls back to console logging), sent only to confirmed addresses
 - Landing page with marketing copy and waitlist form
+- Integrations (optional, recommended after the first brief, never during onboarding): Google Calendar read-only import and public Greenhouse/Lever job boards
+- Verified moves: a move built on an imported calendar event or a live job posting is labeled "Verified source" with a link to the real source and an honest checked-ago timestamp; the label is enforced server-side and cannot be produced by the model alone
+- Integration trust rules: read-only access; Koda never sends email, never creates or edits calendar events, never contacts anyone; disconnecting deletes everything Koda imported (moves already on the board keep their copied source link as personal history)
+- Integration management in Settings: connection status, plain-language scope disclosure, Sync now, disconnect-with-deletion; job boards suggested from the user's own target companies with a paste-a-URL fallback (honest framing: public Greenhouse/Lever boards only)
 
 ## Non-Goals
 
 - Koda is not a job board or ATS
 - Koda does not apply to jobs on behalf of users
 - Koda does not send messages on behalf of users — there is no Send action anywhere, and the API rejects the legacy `sent` status
-- Koda does not invent people, openings, or research; move sources are labeled
-- No social auth (Google, GitHub, etc.) currently
+- Koda does not invent people, openings, or research; move sources are labeled, and "verified" is unforgeable (server-side ref resolution)
+- Koda never scans a mailbox, scrapes LinkedIn, or automates any outbound action; integrations are pull-only by construction
+- No social auth (Google, GitHub, etc.) currently — Google OAuth exists only as the Calendar data integration
 
 ## Product Uncertainties (need Dylan's confirmation)
 

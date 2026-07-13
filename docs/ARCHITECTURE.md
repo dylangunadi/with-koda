@@ -25,6 +25,12 @@ All backend logic runs as Next.js API routes and server actions:
 | `/api/briefs` | POST | User | Scheduled-brief consent and email-digest opt-in (sole writer of brief settings) |
 | `/api/briefs/confirm` | GET | Token | Email double-opt-in confirmation |
 | `/api/cron/brief` | GET | CRON_SECRET | Scheduled brief generation, idempotent per user per day |
+| `/api/cron/sync` | GET | CRON_SECRET | Scheduled integration sync (runs 1h before the brief cron), idempotent per integration per day |
+| `/api/integrations/google/connect` | GET | User | Start Google Calendar OAuth (state + PKCE in signed httpOnly cookies; mock short-circuit without credentials) |
+| `/api/integrations/google/callback` | GET | User | OAuth callback: verify state, exchange code, verify granted scopes, store encrypted tokens, run initial sync |
+| `/api/integrations/google/disconnect` | POST | User | Revoke at Google (best-effort) and delete the integration; cascade removes tokens, sync runs, imported events |
+| `/api/integrations/sync` | POST | User | Manual "Sync now" (2-minute rate limit) |
+| `/api/integrations/boards` | POST/DELETE | User | Add (validated with a live fetch) or remove a public Greenhouse/Lever board |
 | `/api/waitlist` | POST | Public | Waitlist signup |
 
 Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist reviewed profile, close conversation, generate first brief — idempotent); `saveProfile` in `src/app/onboarding/actions.ts` (profile fields only; never touches brief settings).
@@ -38,13 +44,22 @@ Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist review
 
 Server-authoritative rules regardless of provider: the onboarding checklist and `done` decision are computed server-side; extraction merges never empty a field; ongoing-mode proposals write nothing until `/api/talk/confirm`; old profile values in diffs are filled server-side. A test-only failure-injection header (`x-koda-test-ai: fail`) works only in mock mode outside production and can only cause failures.
 
+## Integration Layer
+
+`src/lib/koda/integrations/` mirrors the AI provider pattern: pull-only adapter interfaces (`CalendarSource`, `OpportunitySource`) with real implementations (Google Calendar via syncToken incremental sync with 410 full-resync fallback; Greenhouse/Lever public JSON boards) and deterministic mock twins selected by `KODA_INTEGRATIONS_MOCK=1` or missing Google credentials. Adapters have no push methods, so "Koda never contacts anyone" is structural.
+
+- **Tokens**: AES-256-GCM at rest (`crypto.ts`), lifecycle in `tokens.ts` (server-only; refresh at <120s to expiry; `invalid_grant` flips the integration to a calm "reconnect needed" state). Tokens are never logged and never readable outside the service role.
+- **Sync engine** (`sync.ts`): claim-first idempotency via the sync-runs unique index (mirrors the briefs cron); upserts normalized records on dedup keys; job-board postings absent from a fetch are marked `closed`, never silently deleted; per-integration failure isolation.
+- **Grounding** (`src/lib/koda/grounding.ts`): external records enter the move-generation prompt as `[EVn]`/`[OPn]` refs; the model must cite a ref to earn `source_status: "verified"`, and the resolver enforces it server-side — a verified claim without a resolvable ref is downgraded to `ai_suggested` and stripped of links. Moves link to their source rows and copy `source_url` + `source_fetched_at` so provenance survives disconnect.
+- **Failure injection**: `x-koda-test-integration: fail` works only in mock mode outside production, and can only cause failures.
+
 ## Authentication
 
 - **Supabase Auth** with email + password
 - Session refresh via middleware (`src/middleware.ts`)
 - Server-side: `supabase.auth.getUser()` in API routes and server components
 - Client-side: `createBrowserClient` from `@supabase/ssr`
-- No OAuth providers configured
+- No OAuth providers configured for login. Google OAuth exists only as a data integration (Calendar read-only), separate from auth: see Integration Layer
 - Middleware matcher excludes static assets, images, and `/api/waitlist`
 - Route protection is per-page: "onboarded" means a `profiles` row exists (login, `/inbox`, and `/talk` all branch on it)
 
@@ -59,7 +74,12 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
   - `koda_conversations` / `koda_messages` — conversation state; `extracted` jsonb is the structured resume mechanism; proposals live on message payloads
   - `relationships` — confirmed relationship memory; `source_message` preserves the user's words verbatim
   - `koda_events` — product event log (ids/enums/counts only; see `src/lib/koda/events.ts`)
-- All tables have RLS policies scoping data to `auth.uid() = user_id`
+  - `integrations` — provider connections (google_calendar | job_boards): status, scopes, config, sync cursor. Never contains secrets
+  - `integration_tokens` — OAuth tokens encrypted with AES-256-GCM (`KODA_TOKEN_ENC_KEY`). RLS enabled with ZERO policies plus revoked grants: only the service role can touch it. All access goes through `src/lib/koda/integrations/tokens.ts` (server-only)
+  - `integration_sync_runs` — per-sync bookkeeping; a partial unique index makes scheduled syncs idempotent per integration per day
+  - `external_events` — normalized calendar events (dedup unique index on user/provider/external_id; cancelled events marked, never deleted; deterministic classification: coffee_chat | recruiter_call | interview | deadline | other)
+  - `external_opportunities` — job postings from public ATS boards with `verification_status` (verified_live | stale | closed), source URL, and fetch time
+- All tables have RLS policies scoping data to `auth.uid() = user_id` (exception: `integration_tokens`, deliberately service-role-only as above)
 - Migrations in `supabase/migrations/`. Known issue: the two `20260710_*` files sort against their dependency order; apply `koda_mvp_schema` before `koda_agentic_layer` on a fresh database.
 - Cron endpoint uses service role key to bypass RLS
 
@@ -70,6 +90,8 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
 | Supabase | Database + Auth | Yes |
 | Anthropic Claude (Sonnet 4.5) | Conversation + move generation | No (labeled offline provider without it) |
 | Resend | Email digests | No (console fallback) |
+| Google Calendar API | Read-only calendar import (grounded prep/follow-up moves) | No (labeled mock adapters without credentials) |
+| Greenhouse / Lever public boards | Verified job postings (no auth needed) | No |
 | Vercel | Hosting + Cron | Yes (production) |
 | Vercel Analytics | Usage tracking | No |
 
@@ -115,7 +137,7 @@ scripts/           — Dev, validation, and review scripts
 
 - **Platform**: Vercel
 - **Domain**: withkoda.app
-- **Cron**: `/api/cron/brief` at `0 8 * * *` (configured in `vercel.json`; crons run on production deployments only)
+- **Cron**: `/api/cron/sync` at `0 7 * * *`, then `/api/cron/brief` at `0 8 * * *` (configured in `vercel.json`; crons run on production deployments only) — sync runs first so scheduled briefs see fresh data
 - **Package manager**: npm (package-lock.json)
 - **Node.js**: LTS (configured in CI)
 
@@ -126,7 +148,7 @@ scripts/           — Dev, validation, and review scripts
 | Production (`main`) | `recruit-crm` (`fbjcohgaaeaojdgtyxbm`) | Live data. Vercel env vars scoped to Production only. |
 | Preview (branches/PRs) | `koda-staging` (`nxwcxhdhznkesmjhpnba`) | Full schema applied (all repo migrations + waitlist), zero data. Vercel env vars scoped to Preview point here so branch testing can never touch production data. |
 
-Preview-scoped Vercel variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (staging's), `CRON_SECRET` (any random string; lets you exercise `/api/cron/brief` manually on a preview), and either `ANTHROPIC_API_KEY` or `KODA_AI_MOCK=1` (labeled offline provider). Production-scoped variables must not be set to "All Environments", or previews would write to production.
+Preview-scoped Vercel variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (staging's), `CRON_SECRET` (any random string; lets you exercise `/api/cron/brief` manually on a preview), and either `ANTHROPIC_API_KEY` or `KODA_AI_MOCK=1` (labeled offline provider). Integrations additionally use `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `KODA_TOKEN_ENC_KEY` (32-byte base64, distinct per environment; rotation invalidates stored tokens) — or `KODA_INTEGRATIONS_MOCK=1` for the labeled mock adapters. Production-scoped variables must not be set to "All Environments", or previews would write to production.
 
 ## Known Architectural Risks
 
