@@ -317,3 +317,88 @@ select:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
 }
+
+/* ------------------------------------------------------------------ */
+/* Call orb: the visual center of a Talk to Koda call. State-reactive */
+/* via data-state; every animation is transform/opacity only.         */
+.call-orb {
+  position: relative;
+  width: 11rem;
+  height: 11rem;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: radial-gradient(circle at 32% 28%, #34c4ba 0%, var(--primary) 55%, #075B59 100%);
+  box-shadow: 0 18px 50px -18px rgba(8, 124, 120, 0.55);
+  transition: transform 200ms ease-out, opacity 200ms ease-out;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.call-orb:active {
+  transform: scale(0.97);
+}
+.call-orb:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--primary),
+    0 18px 50px -18px rgba(8, 124, 120, 0.55);
+}
+
+/* Breathing while listening */
+.call-orb[data-state="listening"] {
+  animation: orbBreathe 3.2s ease-in-out infinite;
+}
+@keyframes orbBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Slow shimmer while thinking */
+.call-orb[data-state="processing"]::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px dashed rgba(8, 124, 120, 0.5);
+  animation: orbSpin 6s linear infinite;
+}
+@keyframes orbSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Ripple rings while speaking */
+.call-orb[data-state="speaking"]::before,
+.call-orb[data-state="speaking"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  opacity: 0;
+  animation: orbRipple 1.8s ease-out infinite;
+}
+.call-orb[data-state="speaking"]::after {
+  animation-delay: 0.9s;
+}
+@keyframes orbRipple {
+  0% { transform: scale(1); opacity: 0.45; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+
+.call-orb[data-state="muted"] {
+  opacity: 0.45;
+  animation: none;
+}
+.call-orb[data-state="error"] {
+  opacity: 0.6;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .call-orb,
+  .call-orb::before,
+  .call-orb::after {
+    animation: none !important;
+  }
+}

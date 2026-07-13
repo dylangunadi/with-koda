@@ -74,6 +74,7 @@ export default async function TalkPage() {
         firstQuestion=""
         totalFields={0}
         initialAiMode={isMockMode() ? "mock" : "live"}
+        voiceMode={process.env.OPENAI_API_KEY ? "cloud" : "browser"}
       />
     );
   }
@@ -98,6 +99,7 @@ export default async function TalkPage() {
       firstQuestion={firstQuestion}
       totalFields={ONBOARDING_FIELDS.length}
       initialAiMode={isMockMode() ? "mock" : "live"}
+      voiceMode={process.env.OPENAI_API_KEY ? "cloud" : "browser"}
     />
   );
 }

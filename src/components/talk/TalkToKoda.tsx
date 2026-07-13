@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, Phone, PhoneOff, Keyboard } from "lucide-react";
+import { Mic, MicOff, Phone, PhoneOff, Keyboard, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ReviewConfirm } from "@/components/talk/ReviewConfirm";
@@ -29,6 +29,7 @@ interface TalkToKodaProps {
   firstQuestion: string;
   totalFields: number;
   initialAiMode: "live" | "mock";
+  voiceMode: "cloud" | "browser";
 }
 
 const ONBOARDING_GREETING =
@@ -44,6 +45,7 @@ const STATE_LABELS: Partial<Record<CallStatus, string>> = {
   speaking: "Koda is speaking",
   network_error: "Connection trouble",
   recognition_error: "Could not hear that",
+  ai_error: "Koda had trouble replying",
 };
 
 interface TurnAttempt {
@@ -60,6 +62,7 @@ export function TalkToKoda({
   firstQuestion,
   totalFields,
   initialAiMode,
+  voiceMode,
 }: TalkToKodaProps) {
   const router = useRouter();
   const onboarding = mode === "onboarding";
@@ -93,6 +96,7 @@ export function TalkToKoda({
   const [done, setDone] = useState(onboarding && initialMissing.length === 0);
   const [aiMode, setAiMode] = useState<string>(initialAiMode);
   const [announcement, setAnnouncement] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inFlightRef = useRef(false);
@@ -100,28 +104,34 @@ export function TalkToKoda({
 
   const sendRef = useRef<(text: string, voice: boolean, retryTurnId?: string) => void>(() => {});
 
-  const call = useCallMachine({
-    onTurnReady: (text, { lowConfidence }) => {
-      if (lowConfidence || inFlightRef.current) {
-        // Low confidence: let the user correct what was heard before it goes
-        // anywhere. Turn still in flight (they interrupted and kept talking):
-        // never drop their words silently; hand them to the composer.
-        setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
-        setInputHint(
-          inFlightRef.current
-            ? "Koda was still answering. Send this when you are ready."
-            : "Check what Koda heard, then send."
-        );
-        inputRef.current?.focus();
-        return;
-      }
-      sendRef.current(text, true);
+  const call = useCallMachine(
+    {
+      onTurnReady: (text, { lowConfidence }) => {
+        if (lowConfidence || inFlightRef.current) {
+          // Low confidence: let the user correct what was heard before it goes
+          // anywhere. Turn still in flight (they interrupted and kept talking):
+          // never drop their words silently; hand them to the composer.
+          setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+          setInputHint(
+            inFlightRef.current
+              ? "Koda was still answering. Send this when you are ready."
+              : "Check what Koda heard, then send."
+          );
+          // Corrections need the composer: surface it during a call.
+          setPanelOpen(true);
+          inputRef.current?.focus();
+          return;
+        }
+        sendRef.current(text, true);
+      },
     },
-  });
+    { cloudTts: voiceMode === "cloud" }
+  );
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, done, call.status]);
+  }, [messages, done, call.status, panelOpen]);
+
 
   const send = useCallback(
     async (rawText: string, voice: boolean, retryTurnId?: string) => {
@@ -157,6 +167,7 @@ export function TalkToKoda({
         setMessages((prev) => prev.filter((m) => !m.streaming).slice(0, -1));
         setInput(text);
         setError(message);
+        setPanelOpen(true); // the recovery lives in the composer
         call.failTurn(kind);
         inputRef.current?.focus();
       };
@@ -278,38 +289,150 @@ export function TalkToKoda({
   const answered = totalFields - missing.length;
   const inCall = call.callActive;
   const stateLabel = call.muted && inCall ? "Muted" : STATE_LABELS[call.status];
+  const orbState = call.muted
+    ? "muted"
+    : call.status === "listening" || call.status === "connecting"
+      ? "listening"
+      : call.status === "processing"
+        ? "processing"
+        : call.status === "speaking"
+          ? "speaking"
+          : "error";
+
+  const header = (
+    <header className="relative z-10 shrink-0 border-b border-border/40 bg-background/90 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-6">
+        <div className="flex items-center gap-2">
+          <div className="status-dot" />
+          <span className="font-heading text-xl font-bold tracking-tight text-foreground">Koda</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {aiMode === "mock" && (
+            <span className="font-system text-muted-foreground" title="No AI key configured; Koda is using its offline sample engine.">
+              Offline sample mode
+            </span>
+          )}
+          {onboarding ? (
+            <span className="font-system text-primary">
+              {done ? "Review" : `${answered} of ${totalFields} covered`}
+            </span>
+          ) : (
+            <Link
+              href="/inbox"
+              className="font-system text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Back to inbox
+            </Link>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+
+  const errorBanner = error && (
+    <div
+      role="alert"
+      className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-2.5 text-sm text-destructive"
+    >
+      <span>{error}</span>
+      <button
+        type="button"
+        onClick={retry}
+        disabled={sending}
+        className="shrink-0 font-medium underline underline-offset-2"
+      >
+        Retry
+      </button>
+    </div>
+  );
+
+  const permissionAlert = call.status === "permission_denied" && (
+    <p role="alert" className="font-system text-destructive">
+      Microphone is blocked. Keep typing, or allow the mic in your browser settings.
+    </p>
+  );
+
+  const composer = (
+    <>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(input, false);
+        }}
+        className="flex items-end gap-3"
+      >
+        <Textarea
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send(input, false);
+            }
+          }}
+          placeholder={onboarding ? "Type your answer" : "Tell Koda what happened, or ask what to do next"}
+          aria-label="Message Koda"
+          rows={1}
+          className="min-h-[44px] max-h-32 resize-none rounded-lg text-[15px]"
+          autoFocus={!inCall}
+        />
+        <Button
+          type="submit"
+          disabled={sending || !input.trim()}
+          className="h-11 rounded-lg bg-primary px-5 font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
+        >
+          {sending ? "Sending" : "Send"}
+        </Button>
+      </form>
+      <p className="min-h-4 font-system text-muted-foreground">
+        {inputHint ?? "Enter to send. Shift plus Enter for a new line."}
+      </p>
+    </>
+  );
+
+  const transcript = (
+    <div className="space-y-6">
+      {resumed && onboarding && !inCall && (
+        <p className="font-system text-muted-foreground text-center">
+          Resumed. Nothing you said was lost.
+        </p>
+      )}
+      {messages.map((m, i) =>
+        m.role === "koda" ? (
+          <div key={m.id ?? i} className="max-w-[85%] space-y-3">
+            <div>
+              <p className="font-system text-primary mb-1.5">Koda</p>
+              <p className="text-[15px] leading-relaxed text-foreground whitespace-pre-wrap">
+                {m.content}
+                {m.streaming && <span className="inline-block w-2 h-4 ml-0.5 align-text-bottom bg-primary/40 animate-pulse" aria-hidden />}
+              </p>
+            </div>
+            {m.proposal && m.id && (
+              <ConfirmationCard
+                messageId={m.id}
+                proposal={m.proposal}
+                initialStatus={m.proposalStatus ?? "pending"}
+              />
+            )}
+          </div>
+        ) : (
+          <div key={i} className="max-w-[85%] ml-auto">
+            <div className="rounded-xl bg-accent px-4 py-3 text-[15px] leading-relaxed text-accent-foreground whitespace-pre-wrap">
+              {m.content}
+            </div>
+          </div>
+        )
+      )}
+      {done && onboarding && (
+        <ReviewConfirm extracted={extracted} onDone={() => router.push("/inbox?from=talk")} />
+      )}
+    </div>
+  );
 
   return (
     <div className="h-dvh bg-background relative overflow-hidden flex flex-col">
       <div className="grain fixed inset-0 pointer-events-none" />
-
-      <header className="relative z-10 shrink-0 border-b border-border/40 bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <div className="status-dot" />
-            <span className="font-heading text-xl font-bold tracking-tight text-foreground">Koda</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {aiMode === "mock" && (
-              <span className="font-system text-muted-foreground" title="No AI key configured; Koda is using its offline sample engine.">
-                Offline sample mode
-              </span>
-            )}
-            {onboarding ? (
-              <span className="font-system text-primary">
-                {done ? "Review" : `${answered} of ${totalFields} covered`}
-              </span>
-            ) : (
-              <Link
-                href="/inbox"
-                className="font-system text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Back to inbox
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
 
       {/* Screen readers hear each completed reply once; a live region on the
           transcript itself would re-announce every streamed word. */}
@@ -317,92 +440,33 @@ export function TalkToKoda({
         {announcement}
       </div>
 
-      {/* Transcript: the only scrolling region; the page never grows. */}
-      <div ref={scrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
-        <div className="mx-auto max-w-2xl px-6 py-8 space-y-6">
-          {resumed && onboarding && (
-            <p className="font-system text-muted-foreground text-center">
-              Resumed. Nothing you said was lost.
-            </p>
-          )}
-          {messages.map((m, i) =>
-            m.role === "koda" ? (
-              <div key={m.id ?? i} className="max-w-[85%] space-y-3">
-                <div>
-                  <p className="font-system text-primary mb-1.5">Koda</p>
-                  <p className="text-[15px] leading-relaxed text-foreground whitespace-pre-wrap">
-                    {m.content}
-                    {m.streaming && <span className="inline-block w-2 h-4 ml-0.5 align-text-bottom bg-primary/40 animate-pulse" aria-hidden />}
-                  </p>
-                </div>
-                {m.proposal && m.id && (
-                  <ConfirmationCard
-                    messageId={m.id}
-                    proposal={m.proposal}
-                    initialStatus={m.proposalStatus ?? "pending"}
-                  />
-                )}
-              </div>
-            ) : (
-              <div key={i} className="max-w-[85%] ml-auto">
-                <div className="rounded-xl bg-accent px-4 py-3 text-[15px] leading-relaxed text-accent-foreground whitespace-pre-wrap">
-                  {m.content}
-                </div>
-              </div>
-            )
-          )}
-          {inCall && call.interim && (
-            <div className="max-w-[85%] ml-auto">
-              <div className="rounded-xl border border-dashed border-primary/40 px-4 py-3 text-[15px] leading-relaxed text-muted-foreground italic">
-                {call.interim}
-              </div>
-            </div>
-          )}
-          {done && onboarding && (
-            <ReviewConfirm extracted={extracted} onDone={() => router.push("/inbox?from=talk")} />
-          )}
-        </div>
-      </div>
+      {header}
 
-      {/* Persistent controls. Text input stays available in every state. */}
-      {!done && (
-        <div className="relative z-10 shrink-0 border-t border-border/40 bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto max-w-2xl px-6 py-3 space-y-3">
-            {error && (
-              <div
-                role="alert"
-                className="flex items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-2.5 text-sm text-destructive"
-              >
-                <span>{error}</span>
-                <button
-                  type="button"
-                  onClick={retry}
-                  disabled={sending}
-                  className="shrink-0 font-medium underline underline-offset-2"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            {call.status === "permission_denied" && (
-              <p role="alert" className="font-system text-destructive">
-                Microphone is blocked. Keep typing, or allow the mic in your browser settings.
-              </p>
-            )}
-
-            {/* Call controls */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2" aria-live="polite">
+      {inCall ? (
+        /* ---------------- Call surface: a call, not a chat ---------------- */
+        <div className="relative z-10 flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-6 px-6">
+            <button
+              type="button"
+              className="call-orb"
+              data-state={orbState}
+              onClick={call.interrupt}
+              aria-label={
+                call.status === "speaking"
+                  ? "Interrupt Koda"
+                  : `Call status: ${stateLabel ?? "in call"}`
+              }
+            />
+            <div className="flex flex-col items-center gap-1.5 text-center" aria-live="polite">
+              <div className="flex items-center gap-2">
                 {call.micActive && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 font-system text-accent-foreground">
                     <span className="status-dot" aria-hidden />
                     Mic on
                   </span>
                 )}
-                {inCall && stateLabel && (
-                  <span className="font-system text-primary">{stateLabel}</span>
-                )}
-                {inCall && !call.muted && call.status === "network_error" && (
+                {stateLabel && <span className="font-system text-primary">{stateLabel}</span>}
+                {!call.muted && call.status === "network_error" && (
                   <button
                     type="button"
                     onClick={call.reconnect}
@@ -412,91 +476,111 @@ export function TalkToKoda({
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {call.supported && !inCall && call.status !== "permission_denied" && (
-                  <Button
-                    type="button"
-                    onClick={call.startCall}
-                    className="h-10 rounded-full bg-primary px-5 font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
-                  >
-                    <Phone className="size-4" aria-hidden />
-                    <span>{call.status === "ended" ? "Call again" : "Start call"}</span>
-                  </Button>
-                )}
-                {inCall && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={call.toggleMute}
-                      aria-pressed={call.muted}
-                      className="h-10 rounded-full px-4"
-                    >
-                      {call.muted ? <MicOff className="size-4" aria-hidden /> : <Mic className="size-4" aria-hidden />}
-                      <span>{call.muted ? "Unmute" : "Mute"}</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        call.endCall();
-                        inputRef.current?.focus();
-                      }}
-                      className="h-10 rounded-full px-4"
-                    >
-                      <Keyboard className="size-4" aria-hidden />
-                      <span>Switch to text</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={call.endCall}
-                      className="h-10 rounded-full bg-destructive/10 px-4 font-semibold text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors"
-                    >
-                      <PhoneOff className="size-4" aria-hidden />
-                      <span>End call</span>
-                    </Button>
-                  </>
-                )}
-              </div>
+              {call.status === "speaking" && (
+                <p className="font-system text-muted-foreground">Tap the circle to interrupt</p>
+              )}
+              {call.interim && (
+                <p className="max-w-md text-[15px] italic leading-relaxed text-muted-foreground">
+                  {call.interim}
+                </p>
+              )}
             </div>
+          </div>
 
-            {/* Composer: the text path is always available. */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                send(input, false);
-              }}
-              className="flex items-end gap-3"
+          {/* Call controls */}
+          <div className="shrink-0 flex items-center justify-center gap-4 px-6 pb-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={call.toggleMute}
+              aria-pressed={call.muted}
+              aria-label={call.muted ? "Unmute microphone" : "Mute microphone"}
+              className="h-12 w-12 rounded-full p-0"
             >
-              <Textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    send(input, false);
-                  }
-                }}
-                placeholder={onboarding ? "Type your answer" : "Tell Koda what happened, or ask what to do next"}
-                aria-label="Message Koda"
-                rows={1}
-                className="min-h-[44px] max-h-32 resize-none rounded-lg text-[15px]"
-                autoFocus
-              />
-              <Button
-                type="submit"
-                disabled={sending || !input.trim()}
-                className="h-11 rounded-lg bg-primary px-5 font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
+              {call.muted ? <MicOff className="size-5" aria-hidden /> : <Mic className="size-5" aria-hidden />}
+            </Button>
+            <Button
+              type="button"
+              onClick={call.endCall}
+              aria-label="End call"
+              className="h-14 w-14 rounded-full bg-destructive/10 p-0 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors"
+            >
+              <PhoneOff className="size-6" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                call.endCall();
+                setPanelOpen(true);
+                inputRef.current?.focus();
+              }}
+              aria-label="Switch to text"
+              className="h-12 w-12 rounded-full p-0"
+            >
+              <Keyboard className="size-5" aria-hidden />
+            </Button>
+          </div>
+
+          {/* Conversation panel: demoted during a call, one tap away */}
+          <div className="relative z-10 shrink-0 border-t border-border/40 bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+            <div className="mx-auto max-w-2xl px-6 py-2 space-y-3">
+              {errorBanner}
+              {permissionAlert}
+              <button
+                type="button"
+                onClick={() => setPanelOpen((v) => !v)}
+                aria-expanded={panelOpen}
+                className="flex h-11 w-full items-center justify-center gap-1.5 font-system text-muted-foreground hover:text-foreground transition-colors"
               >
-                {sending ? "Sending" : "Send"}
-              </Button>
-            </form>
-            <p className="min-h-4 font-system text-muted-foreground">
-              {inputHint ?? "Enter to send. Shift plus Enter for a new line."}
-            </p>
+                {panelOpen ? <ChevronDown className="size-4" aria-hidden /> : <ChevronUp className="size-4" aria-hidden />}
+                {panelOpen ? "Hide conversation" : "Show conversation"}
+              </button>
+              {panelOpen && (
+                <div className="space-y-3">
+                  <div ref={scrollRef} className="max-h-[30dvh] overflow-y-auto pr-1">
+                    {transcript}
+                  </div>
+                  {composer}
+                </div>
+              )}
+            </div>
           </div>
         </div>
+      ) : (
+        /* ---------------- Text surface: the chat layout ---------------- */
+        <>
+          <div ref={scrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
+            <div className="mx-auto max-w-2xl px-6 py-8">{transcript}</div>
+          </div>
+
+          {!done && (
+            <div className="relative z-10 shrink-0 border-t border-border/40 bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+              <div className="mx-auto max-w-2xl px-6 py-3 space-y-3">
+                {errorBanner}
+                {permissionAlert}
+                <div className="flex items-center justify-between gap-3">
+                  <div aria-live="polite">
+                    {call.status === "ended" && (
+                      <span className="font-system text-muted-foreground">Call ended</span>
+                    )}
+                  </div>
+                  {call.supported && call.status !== "permission_denied" && (
+                    <Button
+                      type="button"
+                      onClick={call.startCall}
+                      className="h-10 rounded-full bg-primary px-5 font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
+                    >
+                      <Phone className="size-4" aria-hidden />
+                      <span>{call.status === "ended" ? "Call again" : "Start call"}</span>
+                    </Button>
+                  )}
+                </div>
+                {composer}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
