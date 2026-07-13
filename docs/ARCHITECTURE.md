@@ -115,9 +115,18 @@ scripts/           — Dev, validation, and review scripts
 
 - **Platform**: Vercel
 - **Domain**: withkoda.app
-- **Cron**: `/api/cron/brief` at `0 8 * * *` (configured in `vercel.json`)
+- **Cron**: `/api/cron/brief` at `0 8 * * *` (configured in `vercel.json`; crons run on production deployments only)
 - **Package manager**: npm (package-lock.json)
 - **Node.js**: LTS (configured in CI)
+
+### Environments
+
+| Environment | Supabase project | Notes |
+|---|---|---|
+| Production (`main`) | `recruit-crm` (`fbjcohgaaeaojdgtyxbm`) | Live data. Vercel env vars scoped to Production only. |
+| Preview (branches/PRs) | `koda-staging` (`nxwcxhdhznkesmjhpnba`) | Full schema applied (all repo migrations + waitlist), zero data. Vercel env vars scoped to Preview point here so branch testing can never touch production data. |
+
+Preview-scoped Vercel variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (staging's), `CRON_SECRET` (any random string; lets you exercise `/api/cron/brief` manually on a preview), and either `ANTHROPIC_API_KEY` or `KODA_AI_MOCK=1` (labeled offline provider). Production-scoped variables must not be set to "All Environments", or previews would write to production.
 
 ## Known Architectural Risks
 
