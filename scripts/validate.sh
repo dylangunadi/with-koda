@@ -23,13 +23,19 @@ npx tsc --noEmit
 echo -e "${GREEN}Type-check passed.${NC}"
 echo ""
 
-# 3. Build
+# 3. Unit tests
+echo "--- Unit tests ---"
+npm run test:unit
+echo -e "${GREEN}Unit tests passed.${NC}"
+echo ""
+
+# 4. Build
 echo "--- Build ---"
 npm run build
 echo -e "${GREEN}Build passed.${NC}"
 echo ""
 
-# 4. Playwright tests (only when the browser Playwright will use actually
+# 5. Playwright tests (only when the browser Playwright will use actually
 # exists; honors PLAYWRIGHT_BROWSERS_PATH installs and the
 # PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH override from playwright.config.ts)
 BROWSER_PATH=$(node -e '

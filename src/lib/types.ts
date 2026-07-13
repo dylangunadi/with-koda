@@ -30,7 +30,11 @@ export interface Profile {
 // accept it (Koda has no sending integration, so nothing may claim "sent").
 export type MoveStatus = "generated" | "accepted" | "rejected" | "sent" | "saved" | "completed";
 
-export type MoveSourceStatus = "user_provided" | "inferred" | "ai_suggested";
+// 'verified' means the move is backed by a live external record (calendar
+// event or job posting) with a source URL and fetch time. The label is
+// enforced server-side: a generated move claiming 'verified' without a
+// resolvable source_ref is downgraded to 'ai_suggested'.
+export type MoveSourceStatus = "user_provided" | "inferred" | "ai_suggested" | "verified";
 
 export type MoveType =
   | "opportunity"
@@ -71,6 +75,10 @@ export interface RecruitingMove {
   actual_effort_bucket: EffortBucket | null;
   expected_outcome: string | null;
   source_status: MoveSourceStatus;
+  external_event_id: string | null;
+  external_opportunity_id: string | null;
+  source_url: string | null;
+  source_fetched_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -178,4 +186,115 @@ export interface AgentContext {
   move_events: MoveEvent[];
   feedback: FeedbackPattern;
   relationships: Relationship[];
+  calendar: CalendarContext;
+  opportunities: ExternalOpportunity[];
+}
+
+// --- Integration types ---
+
+export type IntegrationProvider = "google_calendar" | "job_boards";
+export type IntegrationStatus = "connected" | "error" | "pending";
+
+/** A configured job board on the job_boards integration. */
+export interface JobBoardConfig {
+  company: string;
+  ats: "greenhouse" | "lever";
+  board_token: string;
+  url: string;
+}
+
+/** User-visible connection record. Never contains secrets — tokens live in
+ * integration_tokens, which no browser client can read. */
+export interface Integration {
+  id: string;
+  user_id: string;
+  provider: IntegrationProvider;
+  status: IntegrationStatus;
+  account_label: string | null;
+  scopes: string[];
+  config: { calendar_ids?: string[]; boards?: JobBoardConfig[] };
+  sync_cursor: string | null;
+  last_synced_at: string | null;
+  last_sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EventClassification =
+  | "coffee_chat"
+  | "recruiter_call"
+  | "interview"
+  | "deadline"
+  | "other";
+
+export interface ExternalEventAttendee {
+  name: string | null;
+  email: string | null;
+}
+
+export interface ExternalEvent {
+  id: string;
+  user_id: string;
+  integration_id: string;
+  provider: string;
+  external_id: string;
+  title: string | null;
+  description_snippet: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  location: string | null;
+  attendees: ExternalEventAttendee[];
+  organizer_email: string | null;
+  html_link: string | null;
+  event_status: "confirmed" | "cancelled";
+  classification: EventClassification | null;
+  relationship_id: string | null;
+  source_updated_at: string | null;
+  fetched_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OpportunityVerification = "verified_live" | "stale" | "closed";
+
+export interface ExternalOpportunity {
+  id: string;
+  user_id: string;
+  integration_id: string;
+  provider: "greenhouse" | "lever";
+  board_token: string;
+  external_id: string;
+  company: string;
+  title: string;
+  location: string | null;
+  department: string | null;
+  absolute_url: string;
+  source_posted_at: string | null;
+  source_updated_at: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  fetched_at: string;
+  verification_status: OpportunityVerification;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarContext {
+  /** Next 14 days, classified, cancelled excluded. Capped small. */
+  upcoming: ExternalEvent[];
+  /** Last 7 days, only events without a linked non-rejected move. */
+  recent_past: ExternalEvent[];
+}
+
+export interface IntegrationSyncRun {
+  id: string;
+  integration_id: string;
+  user_id: string;
+  trigger: "scheduled" | "manual" | "initial";
+  run_date: string;
+  status: "running" | "ok" | "failed";
+  stats: Record<string, number>;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
 }

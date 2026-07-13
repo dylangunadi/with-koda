@@ -4,9 +4,20 @@ import type {
   MoveEvent,
   MoveType,
   AgentContext,
+  CalendarContext,
+  ExternalEvent,
+  ExternalOpportunity,
   FeedbackPattern,
   Relationship,
 } from "@/lib/types";
+
+// Hard caps on external context so the model prompt stays bounded no matter
+// how busy a calendar or board gets. Tune here, nowhere else.
+const UPCOMING_EVENTS_LIMIT = 8;
+const UPCOMING_WINDOW_DAYS = 14;
+const RECENT_PAST_EVENTS_LIMIT = 4;
+const RECENT_PAST_WINDOW_DAYS = 7;
+const OPPORTUNITIES_LIMIT = 8;
 
 /**
  * Build agent context from a user's historical moves and events.
@@ -51,12 +62,81 @@ export async function buildAgentContext(
 
   const feedback = extractFeedbackPatterns(priorMoves, events);
 
+  const [calendar, opportunities] = await Promise.all([
+    loadCalendarContext(supabase, userId, priorMoves),
+    loadOpportunities(supabase, userId),
+  ]);
+
   return {
     prior_moves: priorMoves,
     move_events: events,
     feedback,
     relationships: (relationshipRows ?? []) as Relationship[],
+    calendar,
+    opportunities,
   };
+}
+
+/**
+ * Verified calendar context from connected integrations. Upcoming events
+ * drive prep moves; recent past events without an existing non-rejected move
+ * drive follow-up moves. Cancelled events are excluded from both.
+ */
+async function loadCalendarContext(
+  supabase: SupabaseClient,
+  userId: string,
+  priorMoves: RecruitingMove[]
+): Promise<CalendarContext> {
+  const now = new Date();
+  const windowEnd = new Date(now.getTime() + UPCOMING_WINDOW_DAYS * 86_400_000);
+  const windowStart = new Date(now.getTime() - RECENT_PAST_WINDOW_DAYS * 86_400_000);
+
+  const { data: eventRows } = await supabase
+    .from("external_events")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("event_status", "confirmed")
+    .gte("start_at", windowStart.toISOString())
+    .lte("start_at", windowEnd.toISOString())
+    .order("start_at", { ascending: true })
+    .limit(UPCOMING_EVENTS_LIMIT + RECENT_PAST_EVENTS_LIMIT + 8);
+
+  const all = (eventRows ?? []) as ExternalEvent[];
+
+  // Events that already produced a move the user hasn't rejected are handled;
+  // suggesting them again would be a duplicate.
+  const handledEventIds = new Set(
+    priorMoves
+      .filter((m) => m.external_event_id && m.status !== "rejected")
+      .map((m) => m.external_event_id as string)
+  );
+
+  const nowIso = now.toISOString();
+  const upcoming = all
+    .filter((e) => e.start_at && e.start_at >= nowIso)
+    .slice(0, UPCOMING_EVENTS_LIMIT);
+  const recentPast = all
+    .filter((e) => e.start_at && e.start_at < nowIso && !handledEventIds.has(e.id))
+    .slice(-RECENT_PAST_EVENTS_LIMIT);
+
+  return { upcoming, recent_past: recentPast };
+}
+
+/** Live verified opportunities, newest first. (Target-company prioritization
+ * happens at prompt serialization, where the profile is in hand.) */
+async function loadOpportunities(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<ExternalOpportunity[]> {
+  const { data: rows } = await supabase
+    .from("external_opportunities")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("verification_status", "verified_live")
+    .order("last_seen_at", { ascending: false })
+    .limit(OPPORTUNITIES_LIMIT);
+
+  return (rows ?? []) as ExternalOpportunity[];
 }
 
 function extractFeedbackPatterns(

@@ -33,10 +33,23 @@ const EFFORT_LABELS: Record<EffortBucket, string> = {
 };
 
 const SOURCE_LABELS: Record<MoveSourceStatus, string> = {
+  verified: "Verified source",
   user_provided: "From what you told Koda",
   inferred: "Inferred from your profile",
   ai_suggested: "Koda's suggestion",
 };
+
+// Honest freshness: how long ago Koda actually fetched the source. Stale is
+// shown as stale, never hidden.
+function checkedAgo(fetchedAt: string): string {
+  const ms = Date.now() - new Date(fetchedAt).getTime();
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return "checked just now";
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `checked ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `checked ${days}d ago`;
+}
 
 export function MoveCard({ move }: { move: RecruitingMove }) {
   const [expanded, setExpanded] = useState(false);
@@ -284,9 +297,29 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
           )}
 
           <p className="font-system text-muted-foreground border-t border-border/40 pt-3">
-            {SOURCE_LABELS[move.source_status] ?? SOURCE_LABELS.ai_suggested}
+            {move.source_status === "verified" ? (
+              <span className="text-teal-700 dark:text-teal-400 font-semibold">
+                {SOURCE_LABELS.verified}
+              </span>
+            ) : (
+              SOURCE_LABELS[move.source_status] ?? SOURCE_LABELS.ai_suggested
+            )}
             {move.source_note && ` · ${move.source_note}`}
+            {move.source_fetched_at && ` · ${checkedAgo(move.source_fetched_at)}`}
             {typeof move.confidence === "number" && ` · ${Math.round(move.confidence * 100)}% fit`}
+            {move.source_url && (
+              <>
+                {" · "}
+                <a
+                  href={move.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  View source ↗
+                </a>
+              </>
+            )}
           </p>
         </div>
       )}
