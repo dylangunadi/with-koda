@@ -2,6 +2,7 @@ import type {
   AgentContext,
   ExternalEvent,
   ExternalOpportunity,
+  ExternalThread,
   Profile,
   RecruitingMove,
 } from "@/lib/types";
@@ -20,9 +21,10 @@ import type { GeneratedMove } from "./ai/provider";
 
 export interface ExternalRef {
   ref: string;
-  kind: "event" | "opportunity";
+  kind: "event" | "opportunity" | "thread";
   event?: ExternalEvent;
   opportunity?: ExternalOpportunity;
+  thread?: ExternalThread;
 }
 
 export function buildExternalRefs(
@@ -38,6 +40,10 @@ export function buildExternalRefs(
   ];
   events.forEach((event, i) => {
     refs.push({ ref: `EV${i + 1}`, kind: "event", event });
+  });
+
+  (agentContext.threads ?? []).forEach((thread, i) => {
+    refs.push({ ref: `TH${i + 1}`, kind: "thread", thread });
   });
 
   // Target-company matches first, then newest (query already orders by
@@ -58,6 +64,7 @@ export function buildExternalRefs(
 export type GroundedMove = GeneratedMove & {
   external_event_id: string | null;
   external_opportunity_id: string | null;
+  external_thread_id: string | null;
   source_url: string | null;
   source_fetched_at: string | null;
 };
@@ -93,6 +100,11 @@ export function resolveSourceRefs(
       .filter((m: RecruitingMove) => m.external_opportunity_id && m.status !== "rejected")
       .map((m) => m.external_opportunity_id as string)
   );
+  const handledThreadIds = new Set(
+    priorMoves
+      .filter((m: RecruitingMove) => m.external_thread_id && m.status !== "rejected")
+      .map((m) => m.external_thread_id as string)
+  );
   // Within-batch belt: if the model cites the same ref twice in one
   // generation, only the first move keeps it.
   const consumedRefs = new Set<string>();
@@ -111,6 +123,7 @@ export function resolveSourceRefs(
         source_status: "verified",
         external_event_id: ref.event.id,
         external_opportunity_id: null,
+        external_thread_id: null,
         source_url: ref.event.html_link,
         source_fetched_at: ref.event.fetched_at,
       });
@@ -124,8 +137,23 @@ export function resolveSourceRefs(
         source_status: "verified",
         external_event_id: null,
         external_opportunity_id: ref.opportunity.id,
+        external_thread_id: null,
         source_url: ref.opportunity.absolute_url,
         source_fetched_at: ref.opportunity.fetched_at,
+      });
+      continue;
+    }
+    if (ref?.kind === "thread" && ref.thread) {
+      if (handledThreadIds.has(ref.thread.id)) continue; // duplicate belt
+      resolved.push({
+        ...move,
+        source_ref: refId,
+        source_status: "verified",
+        external_event_id: null,
+        external_opportunity_id: null,
+        external_thread_id: ref.thread.id,
+        source_url: ref.thread.permalink,
+        source_fetched_at: ref.thread.fetched_at,
       });
       continue;
     }
@@ -137,6 +165,7 @@ export function resolveSourceRefs(
       source_status: move.source_status === "verified" ? "ai_suggested" : move.source_status,
       external_event_id: null,
       external_opportunity_id: null,
+      external_thread_id: null,
       source_url: null,
       source_fetched_at: null,
     });
@@ -149,7 +178,8 @@ export function resolveSourceRefs(
  * route through resolveSourceRefs never trip this; it exists so a future
  * code path that skips the resolver cannot forge the label. */
 export function enforceVerifiedIntegrity<T extends GroundedMove>(move: T): T {
-  const linked = move.external_event_id || move.external_opportunity_id;
+  const linked =
+    move.external_event_id || move.external_opportunity_id || move.external_thread_id;
   if (move.source_status === "verified" && !linked) {
     return { ...move, source_status: "ai_suggested", source_url: null, source_fetched_at: null };
   }
@@ -194,6 +224,32 @@ export function renderExternalBlocks(refs: ExternalRef[], now = new Date()): str
       if (event.description_snippet) {
         bits.push(`— ${event.description_snippet.slice(0, SNIPPET_MAX)}`);
       }
+      parts.push(`- ${bits.join(" ")}`);
+    }
+  }
+
+  const threadRefs = refs.filter((r) => r.kind === "thread" && r.thread);
+  if (threadRefs.length > 0) {
+    parts.push(
+      "\nVERIFIED EMAIL THREADS (imported from the student's connected Gmail via their recruiting search — real conversations awaiting the student's reply; participant names are real and you MAY use them):"
+    );
+    for (const { ref, thread } of threadRefs) {
+      if (!thread) continue;
+      const counterpart = thread.participants.find(
+        (p) => p.email && p.email === thread.last_from_email
+      );
+      const bits = [
+        `[${ref}]`,
+        `"${(thread.subject ?? "no subject").slice(0, TITLE_MAX)}"`,
+      ];
+      if (counterpart?.name || counterpart?.email) {
+        bits.push(`from ${counterpart.name ?? counterpart.email}`);
+      }
+      if (thread.last_message_at) {
+        bits.push(`last message ${thread.last_message_at.slice(0, 10)}`);
+      }
+      bits.push("[needs reply]");
+      if (thread.snippet) bits.push(`— ${thread.snippet.slice(0, SNIPPET_MAX)}`);
       parts.push(`- ${bits.join(" ")}`);
     }
   }

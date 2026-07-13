@@ -1,5 +1,5 @@
 import { getGoogleClientId, getGoogleClientSecret } from "@/lib/env";
-import type { CalendarSource, OpportunitySource } from "./types";
+import type { CalendarSource, MailSource, OpportunitySource } from "./types";
 
 /**
  * Adapter selection, mirroring the KODA_AI_MOCK pattern in ai/provider.ts.
@@ -39,6 +39,15 @@ export async function getCalendarSource(): Promise<CalendarSource> {
   }
   const { googleCalendarSource } = await import("./google/calendar");
   return googleCalendarSource;
+}
+
+export async function getMailSource(): Promise<MailSource> {
+  if (isIntegrationsMockMode()) {
+    const { mockMailSource } = await import("./mock/mail");
+    return mockMailSource;
+  }
+  const { gmailSource } = await import("./google/gmail");
+  return gmailSource;
 }
 
 export async function getOpportunitySource(ats: "greenhouse" | "lever"): Promise<OpportunitySource> {

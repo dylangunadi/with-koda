@@ -2,9 +2,13 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Integration, JobBoardConfig, Relationship } from "@/lib/types";
 import { classifyEvent } from "./classify";
-import { getCalendarSource, getOpportunitySource } from "./registry";
+import { getCalendarSource, getMailSource, getOpportunitySource } from "./registry";
 import { getValidAccessToken } from "./tokens";
-import { ReconnectRequiredError, type NormalizedEvent } from "./types";
+import {
+  ReconnectRequiredError,
+  type NormalizedEvent,
+  type NormalizedThread,
+} from "./types";
 
 /**
  * Pull-based sync engine. Claim-first idempotency mirrors the briefs cron:
@@ -286,6 +290,122 @@ export async function runJobBoardsSync(
   }
 }
 
+/** Default recruiting query for Gmail thread import: narrow and topical,
+ * never the whole mailbox. Stored on the integration config at connect time
+ * so users can tighten it later. */
+export const DEFAULT_GMAIL_QUERY =
+  'newer_than:60d (subject:(interview OR application OR recruiting OR recruiter OR "coffee chat" OR offer) OR from:(recruiting OR talent OR careers OR university))';
+
+/** Match a thread's counterpart to confirmed relationship memory by name. */
+function matchThreadRelationship(
+  thread: NormalizedThread,
+  relationships: Relationship[]
+): string | null {
+  for (const participant of thread.participants) {
+    if (!participant.name) continue;
+    const name = participant.name.trim().toLowerCase();
+    const match = relationships.find((r) => r.person_name.trim().toLowerCase() === name);
+    if (match) return match.id;
+  }
+  return null;
+}
+
+export async function runGmailSync(
+  service: SupabaseClient,
+  integration: Integration,
+  trigger: SyncTrigger,
+  options: { forceFail?: boolean } = {}
+): Promise<SyncOutcome> {
+  const claim = await claimRun(service, integration, trigger);
+  if ("skipped" in claim) return { ok: true, skipped: "already_synced_today", stats: {} };
+  if ("error" in claim) return { ok: false, error: claim.error, reconnectRequired: false };
+
+  try {
+    if (options.forceFail) {
+      throw new Error("forced_test_failure");
+    }
+
+    const accessToken = await getValidAccessToken(service, integration.id);
+    const source = await getMailSource();
+    const queries =
+      integration.config.queries && integration.config.queries.length > 0
+        ? integration.config.queries
+        : [DEFAULT_GMAIL_QUERY];
+
+    const { data: relationshipRows } = await service
+      .from("relationships")
+      .select("*")
+      .eq("user_id", integration.user_id)
+      .limit(100);
+    const relationships = (relationshipRows ?? []) as Relationship[];
+
+    // account_label may carry decoration (e.g. mock mode's suffix); compare
+    // against the first email-shaped token only.
+    const accountEmail =
+      (integration.account_label ?? "").toLowerCase().match(/[^\s<>()]+@[^\s<>()]+/)?.[0] ?? "";
+    const fetchedAt = new Date().toISOString();
+    const seen = new Set<string>();
+    const rows: Record<string, unknown>[] = [];
+
+    for (const query of queries.slice(0, 4)) {
+      const { threads } = await source.searchThreads({
+        accessToken,
+        query,
+        maxResults: 25,
+      });
+      for (const thread of threads) {
+        if (seen.has(thread.external_id)) continue;
+        seen.add(thread.external_id);
+        rows.push({
+          user_id: integration.user_id,
+          integration_id: integration.id,
+          provider: "gmail",
+          external_id: thread.external_id,
+          subject: thread.subject,
+          snippet: thread.snippet,
+          participants: thread.participants,
+          last_from_email: thread.last_from_email,
+          last_message_at: thread.last_message_at,
+          message_count: thread.message_count,
+          // Needs a reply when the last word in the thread is someone else's.
+          needs_reply: Boolean(
+            thread.last_from_email &&
+              accountEmail &&
+              thread.last_from_email.toLowerCase() !== accountEmail
+          ),
+          relationship_id: matchThreadRelationship(thread, relationships),
+          permalink: thread.permalink,
+          source_updated_at: thread.source_updated_at,
+          fetched_at: fetchedAt,
+          updated_at: fetchedAt,
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      const { error } = await service
+        .from("external_threads")
+        .upsert(rows, { onConflict: "user_id,provider,external_id" });
+      if (error) {
+        throw new Error(`Thread upsert failed: ${error.message}`);
+      }
+    }
+
+    const stats = { queries: queries.length, fetched: seen.size, upserted: rows.length };
+    await finishRun(service, claim.runId, { status: "ok", stats });
+    await recordSyncSuccess(service, integration.id, undefined);
+    return { ok: true, stats };
+  } catch (err) {
+    const reconnectRequired = err instanceof ReconnectRequiredError;
+    const message = err instanceof Error ? err.message : "Unknown sync error";
+    await finishRun(service, claim.runId, { status: "failed", error: message });
+    if (!reconnectRequired) {
+      await recordSyncFailure(service, integration.id, message);
+    }
+    return { ok: false, error: message, reconnectRequired };
+  }
+}
+
 /** Dispatch by provider; used by the cron and manual sync routes. */
 export async function runIntegrationSync(
   service: SupabaseClient,
@@ -295,6 +415,9 @@ export async function runIntegrationSync(
 ): Promise<SyncOutcome> {
   if (integration.provider === "google_calendar") {
     return runCalendarSync(service, integration, trigger, options);
+  }
+  if (integration.provider === "gmail") {
+    return runGmailSync(service, integration, trigger, options);
   }
   return runJobBoardsSync(service, integration, trigger, options);
 }

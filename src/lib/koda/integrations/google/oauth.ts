@@ -13,6 +13,29 @@ export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
 ];
 
+// gmail.readonly imports thread metadata; gmail.compose allows creating
+// DRAFTS on explicit user action. Neither permits sending on its own, and
+// Koda has no code path that calls send.
+export const GMAIL_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.compose",
+];
+
+export type GoogleService = "calendar" | "gmail";
+
+export function scopesForService(service: GoogleService): string[] {
+  return service === "gmail" ? GMAIL_SCOPES : GOOGLE_CALENDAR_SCOPES;
+}
+
+/** The scope each service cannot function without (users can uncheck boxes;
+ * gmail.compose is optional — without it, draft creation is simply hidden). */
+const REQUIRED_SCOPE: Record<GoogleService, string> = {
+  calendar: "https://www.googleapis.com/auth/calendar.readonly",
+  gmail: "https://www.googleapis.com/auth/gmail.readonly",
+};
+
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const REVOKE_ENDPOINT = "https://oauth2.googleapis.com/revoke";
@@ -22,14 +45,18 @@ export function getRedirectUri(): string {
   return `${getAppUrl()}/api/integrations/google/callback`;
 }
 
-export function buildAuthUrl(input: { state: string; codeChallenge: string }): string {
+export function buildAuthUrl(input: {
+  state: string;
+  codeChallenge: string;
+  service: GoogleService;
+}): string {
   const clientId = getGoogleClientId();
   if (!clientId) throw new Error("GOOGLE_CLIENT_ID is not set");
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: getRedirectUri(),
     response_type: "code",
-    scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+    scope: scopesForService(input.service).join(" "),
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "false",
@@ -148,9 +175,13 @@ export async function fetchAccountEmail(accessToken: string): Promise<string | n
   }
 }
 
-/** True when every required scope was actually granted (users can uncheck
- * boxes on the consent screen). */
-export function hasRequiredScopes(grantedScope: string): boolean {
+/** True when the service's required scope was actually granted (users can
+ * uncheck boxes on the consent screen). */
+export function hasRequiredScopes(grantedScope: string, service: GoogleService): boolean {
   const granted = new Set(grantedScope.split(/\s+/).filter(Boolean));
-  return granted.has("https://www.googleapis.com/auth/calendar.readonly");
+  return granted.has(REQUIRED_SCOPE[service]);
+}
+
+export function hasComposeScope(scopes: string[]): boolean {
+  return scopes.includes("https://www.googleapis.com/auth/gmail.compose");
 }

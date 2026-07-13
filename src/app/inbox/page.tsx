@@ -37,10 +37,7 @@ export default async function InboxPage({
     redirect("/talk");
   }
 
-  // Recommend the calendar integration only after the first brief exists,
-  // only while unconnected, and never again once dismissed. The integrations
-  // lookup is skipped entirely once dismissed.
-  const [{ data: moves }, { data: latestBrief }, calendarIntegration] = await Promise.all([
+  const [{ data: moves }, { data: latestBrief }, { data: integrationRows }] = await Promise.all([
     supabase
       .from("recruiting_moves")
       .select("*")
@@ -53,19 +50,20 @@ export default async function InboxPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    profile.integrations_prompt_dismissed_at
-      ? Promise.resolve(true)
-      : supabase
-          .from("integrations")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("provider", "google_calendar")
-          .maybeSingle()
-          .then((r) => Boolean(r.data)),
+    supabase.from("integrations").select("provider, status").eq("user_id", user.id),
   ]);
 
-  const showConnectPrompt =
-    !calendarIntegration && !profile.integrations_prompt_dismissed_at;
+  const connected = new Set(
+    (integrationRows ?? [])
+      .filter((i) => i.status === "connected")
+      .map((i) => i.provider as string)
+  );
+  const hasCalendar = (integrationRows ?? []).some((i) => i.provider === "google_calendar");
+  const gmailConnected = connected.has("gmail");
+
+  // Recommend the calendar integration only after the first brief exists,
+  // only while unconnected, and never again once dismissed.
+  const showConnectPrompt = !hasCalendar && !profile.integrations_prompt_dismissed_at;
 
   const allMoves = (moves ?? []) as RecruitingMove[];
   const brief = latestBrief as Brief | null;
@@ -112,7 +110,7 @@ export default async function InboxPage({
         <BriefHeader brief={brief} moveCount={briefMoveCount} />
       )}
 
-      <InboxTabs moves={allMoves} />
+      <InboxTabs moves={allMoves} gmailConnected={gmailConnected} />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import type {
   CalendarContext,
   ExternalEvent,
   ExternalOpportunity,
+  ExternalThread,
   FeedbackPattern,
   Relationship,
 } from "@/lib/types";
@@ -18,6 +19,7 @@ const UPCOMING_WINDOW_DAYS = 14;
 const RECENT_PAST_EVENTS_LIMIT = 4;
 const RECENT_PAST_WINDOW_DAYS = 7;
 const OPPORTUNITIES_LIMIT = 8;
+const THREADS_LIMIT = 6;
 
 /**
  * Build agent context from a user's historical moves and events.
@@ -62,9 +64,10 @@ export async function buildAgentContext(
 
   const feedback = extractFeedbackPatterns(priorMoves, events);
 
-  const [calendar, opportunities] = await Promise.all([
+  const [calendar, opportunities, threads] = await Promise.all([
     loadCalendarContext(supabase, userId, priorMoves),
     loadOpportunities(supabase, userId, priorMoves),
+    loadThreads(supabase, userId, priorMoves),
   ]);
 
   return {
@@ -74,7 +77,34 @@ export async function buildAgentContext(
     relationships: (relationshipRows ?? []) as Relationship[],
     calendar,
     opportunities,
+    threads,
   };
+}
+
+/** Imported threads still awaiting the user's reply, newest first, excluding
+ * ones that already produced a non-rejected move. */
+async function loadThreads(
+  supabase: SupabaseClient,
+  userId: string,
+  priorMoves: RecruitingMove[]
+): Promise<ExternalThread[]> {
+  const { data: rows } = await supabase
+    .from("external_threads")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("needs_reply", true)
+    .order("last_message_at", { ascending: false })
+    .limit(THREADS_LIMIT * 2);
+
+  const handledThreadIds = new Set(
+    priorMoves
+      .filter((m) => m.external_thread_id && m.status !== "rejected")
+      .map((m) => m.external_thread_id as string)
+  );
+
+  return ((rows ?? []) as ExternalThread[])
+    .filter((t) => !handledThreadIds.has(t.id))
+    .slice(0, THREADS_LIMIT);
 }
 
 /**

@@ -68,6 +68,46 @@ export interface OpportunitySource {
   pullPostings(board: { boardToken: string; company: string }): Promise<OpportunityPullResult>;
 }
 
+/** Provider-agnostic email thread metadata, ready to upsert into
+ * external_threads. Bodies are never imported; snippet is the provider's
+ * own preview text, truncated at write time. */
+export interface NormalizedThread {
+  external_id: string;
+  subject: string | null;
+  snippet: string | null;
+  participants: NormalizedEventAttendee[];
+  last_from_email: string | null;
+  last_message_at: string | null;
+  message_count: number;
+  permalink: string | null;
+  source_updated_at: string | null;
+}
+
+export interface MailPullResult {
+  threads: NormalizedThread[];
+}
+
+/**
+ * Mail access is split into a pull side (searchThreads, used by sync) and
+ * ONE explicitly user-approved write: createDraft. Drafts are the hard
+ * ceiling — there is deliberately no send method on this interface, so no
+ * code path in Koda can dispatch an email.
+ */
+export interface MailSource {
+  searchThreads(input: {
+    accessToken: string;
+    query: string;
+    maxResults: number;
+  }): Promise<MailPullResult>;
+  createDraft(input: {
+    accessToken: string;
+    to: string;
+    subject: string;
+    body: string;
+    threadId?: string;
+  }): Promise<{ draftId: string }>;
+}
+
 /** Thrown by token/refresh code when the user must reconnect the provider. */
 export class ReconnectRequiredError extends Error {
   constructor(message = "reconnect_required") {

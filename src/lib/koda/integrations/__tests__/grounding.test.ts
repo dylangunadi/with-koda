@@ -116,6 +116,7 @@ function makeContext(overrides: Partial<AgentContext> = {}): AgentContext {
     relationships: [],
     calendar: { upcoming: [], recent_past: [] },
     opportunities: [],
+    threads: [],
     ...overrides,
   };
 }
@@ -319,6 +320,7 @@ describe("enforceVerifiedIntegrity", () => {
       ...makeMove({ source_status: "verified" }),
       external_event_id: null,
       external_opportunity_id: null,
+      external_thread_id: null,
       source_url: "https://evil.example.com",
       source_fetched_at: "2026-07-13T00:00:00Z",
     };
@@ -332,6 +334,7 @@ describe("enforceVerifiedIntegrity", () => {
       ...makeMove({ source_status: "verified" }),
       external_event_id: "ev-row-1",
       external_opportunity_id: null,
+      external_thread_id: null,
       source_url: "https://calendar.google.com/e/1",
       source_fetched_at: "2026-07-13T00:00:00Z",
     };

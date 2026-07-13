@@ -62,7 +62,13 @@ function EmptyState({ status }: { status: MoveStatus }) {
   );
 }
 
-export function InboxTabs({ moves }: { moves: RecruitingMove[] }) {
+export function InboxTabs({
+  moves,
+  gmailConnected = false,
+}: {
+  moves: RecruitingMove[];
+  gmailConnected?: boolean;
+}) {
   const grouped = groupMoves(moves);
 
   return (
@@ -87,7 +93,7 @@ export function InboxTabs({ moves }: { moves: RecruitingMove[] }) {
           ) : (
             <div className="space-y-4">
               {grouped[tab.status].map((move) => (
-                <MoveCard key={move.id} move={move} />
+                <MoveCard key={move.id} move={move} gmailConnected={gmailConnected} />
               ))}
             </div>
           )}

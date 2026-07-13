@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Save, Bookmark, X } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Mail, Save, Bookmark, X } from "lucide-react";
 import type { EffortBucket, MoveSourceStatus, MoveType, RecruitingMove } from "@/lib/types";
 
 // Category color lives only in this small text label; cards stay neutral.
@@ -51,11 +51,18 @@ function checkedAgo(fetchedAt: string): string {
   return `checked ${days}d ago`;
 }
 
-export function MoveCard({ move }: { move: RecruitingMove }) {
+export function MoveCard({
+  move,
+  gmailConnected = false,
+}: {
+  move: RecruitingMove;
+  gmailConnected?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(move.outreach_draft ?? "");
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [creatingDraft, setCreatingDraft] = useState(false);
   const [collecting, setCollecting] = useState<"effort" | "feedback" | null>(null);
   const [feedback, setFeedback] = useState("");
   const router = useRouter();
@@ -100,6 +107,36 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
       "Could not update move"
     );
     if (ok) setCollecting(null);
+  }
+
+  // The one integration write in the product, and it happens only on this
+  // click: a DRAFT in the user's own Gmail, which they review and send
+  // themselves. Nothing is sent, and no Send affordance exists.
+  async function createGmailDraft() {
+    setCreatingDraft(true);
+    try {
+      if (draft !== move.outreach_draft) {
+        await fetch(`/api/moves/${move.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ outreach_draft: draft }),
+        });
+      }
+      const res = await fetch("/api/integrations/gmail/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ move_id: move.id }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Could not create the Gmail draft.");
+        return;
+      }
+      toast.success("Draft saved to your Gmail. Review and send it there when ready.");
+      router.refresh();
+    } finally {
+      setCreatingDraft(false);
+    }
   }
 
   async function saveDraft() {
@@ -267,7 +304,19 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
                 aria-label="Outreach draft"
                 className="text-sm rounded-lg"
               />
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                {gmailConnected && move.external_thread_id && !completed && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={createGmailDraft}
+                    disabled={creatingDraft || !draft.trim()}
+                    className="rounded-lg"
+                  >
+                    <Mail className="size-3.5" aria-hidden />
+                    <span>{creatingDraft ? "Creating..." : "Create Gmail draft"}</span>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

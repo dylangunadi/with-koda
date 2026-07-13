@@ -26,11 +26,12 @@ All backend logic runs as Next.js API routes and server actions:
 | `/api/briefs/confirm` | GET | Token | Email double-opt-in confirmation |
 | `/api/cron/brief` | GET | CRON_SECRET | Scheduled brief generation, idempotent per user per day |
 | `/api/cron/sync` | GET | CRON_SECRET | Scheduled integration sync (runs 1h before the brief cron), idempotent per integration per day |
-| `/api/integrations/google/connect` | GET | User | Start Google Calendar OAuth (state + PKCE in signed httpOnly cookies; mock short-circuit without credentials) |
+| `/api/integrations/google/connect` | GET | User | Start Google OAuth for Calendar or Gmail (`?service=`; state + PKCE + service in signed httpOnly cookies; mock short-circuit without credentials) |
 | `/api/integrations/google/callback` | GET | User | OAuth callback: verify state, exchange code, verify granted scopes, store encrypted tokens, run initial sync |
 | `/api/integrations/google/disconnect` | POST | User | Revoke at Google (best-effort) and delete the integration; cascade removes tokens, sync runs, imported events |
 | `/api/integrations/sync` | POST | User | Manual "Sync now" (2-minute rate limit) |
 | `/api/integrations/boards` | POST/DELETE | User | Add (validated with a live fetch) or remove a public Greenhouse/Lever board |
+| `/api/integrations/gmail/draft` | POST | User | Create a Gmail DRAFT from a thread-grounded move on explicit user click (requires gmail.compose; no send path exists) |
 | `/api/waitlist` | POST | Public | Waitlist signup |
 
 Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist reviewed profile, close conversation, generate first brief — idempotent); `saveProfile` in `src/app/onboarding/actions.ts` (profile fields only; never touches brief settings).
@@ -46,7 +47,7 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
 
 ## Integration Layer
 
-`src/lib/koda/integrations/` mirrors the AI provider pattern: pull-only adapter interfaces (`CalendarSource`, `OpportunitySource`) with real implementations (Google Calendar via syncToken incremental sync with 410 full-resync fallback; Greenhouse/Lever public JSON boards) and deterministic mock twins selected by `KODA_INTEGRATIONS_MOCK=1` or missing Google credentials. Adapters have no push methods, so "Koda never contacts anyone" is structural.
+`src/lib/koda/integrations/` mirrors the AI provider pattern: adapter interfaces (`CalendarSource`, `OpportunitySource`, `MailSource`) with real implementations (Google Calendar via syncToken incremental sync with 410 full-resync fallback; Greenhouse/Lever public JSON boards) and deterministic mock twins selected by `KODA_INTEGRATIONS_MOCK=1` or missing Google credentials. Adapters have no send methods — `MailSource`'s only write is `createDraft`, invoked exclusively by the explicit per-move draft route — so "Koda never contacts anyone" is structural. Gmail import is scoped to a recruiting search query stored on the integration config (never a full-mailbox scan), with `format=metadata` (headers + provider snippet, no bodies).
 
 - **Tokens**: AES-256-GCM at rest (`crypto.ts`), lifecycle in `tokens.ts` (server-only; refresh at <120s to expiry; `invalid_grant` flips the integration to a calm "reconnect needed" state). Tokens are never logged and never readable outside the service role.
 - **Sync engine** (`sync.ts`): claim-first idempotency via the sync-runs unique index (mirrors the briefs cron); upserts normalized records on dedup keys; job-board postings absent from a fetch are marked `closed`, never silently deleted; per-integration failure isolation.
@@ -79,6 +80,7 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
   - `integration_sync_runs` — per-sync bookkeeping; a partial unique index makes scheduled syncs idempotent per integration per day
   - `external_events` — normalized calendar events (dedup unique index on user/provider/external_id; cancelled events marked, never deleted; deterministic classification: coffee_chat | recruiter_call | interview | deadline | other)
   - `external_opportunities` — job postings from public ATS boards with `verification_status` (verified_live | stale | closed), source URL, and fetch time
+  - `external_threads` — Gmail thread metadata matched by the user's recruiting search query (subject, snippet, participants, needs_reply; bodies are never imported)
 - All tables have RLS policies scoping data to `auth.uid() = user_id` (exception: `integration_tokens`, deliberately service-role-only as above)
 - Migrations in `supabase/migrations/`. Known issue: the two `20260710_*` files sort against their dependency order; apply `koda_mvp_schema` before `koda_agentic_layer` on a fresh database.
 - Cron endpoint uses service role key to bypass RLS
@@ -91,6 +93,7 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
 | Anthropic Claude (Sonnet 4.5) | Conversation + move generation | No (labeled offline provider without it) |
 | Resend | Email digests | No (console fallback) |
 | Google Calendar API | Read-only calendar import (grounded prep/follow-up moves) | No (labeled mock adapters without credentials) |
+| Gmail API | Query-scoped thread import + explicit-approval draft creation (restricted scopes: CASA required before public launch; Testing mode for development) | No (labeled mock adapters without credentials) |
 | Greenhouse / Lever public boards | Verified job postings (no auth needed) | No |
 | Vercel | Hosting + Cron | Yes (production) |
 | Vercel Analytics | Usage tracking | No |

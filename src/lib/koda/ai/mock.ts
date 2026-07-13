@@ -325,6 +325,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
   //    loop browser-testable offline.
   const externalRefs = buildExternalRefs(profile, agentContext);
   const eventRef = externalRefs.find((r) => r.kind === "event" && r.event);
+  const threadRef = externalRefs.find((r) => r.kind === "thread" && r.thread);
   const oppRef = externalRefs.find((r) => r.kind === "opportunity" && r.opportunity);
 
   if (eventRef?.event) {
@@ -373,6 +374,33 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
             source_ref: eventRef.ref,
           }
     );
+  }
+
+  if (threadRef?.thread) {
+    const thread = threadRef.thread;
+    const counterpart =
+      thread.participants.find((p) => p.email && p.email === thread.last_from_email)?.name ??
+      "them";
+    const subject = thread.subject ?? "your conversation";
+    moves.push({
+      title: `Reply to "${subject}"`,
+      type: "follow_up",
+      company: null,
+      person: counterpart,
+      fit_reason: `This thread is sitting in your inbox with the last word from ${counterpart}. Recruiting conversations go cold fast; a same-week reply keeps this one alive.`,
+      suggested_action: `Edit the draft below and reply to ${counterpart} today. You send it yourself; Koda never sends anything.`,
+      outreach_draft: `Hi ${counterpart}, thanks for the note! Yes, I would love to find time this week. I am generally free in the afternoons; happy to work around your calendar. Looking forward to it.`,
+      proof_of_work_idea: "",
+      follow_up_timing: "Reply today; nudge once more in 4 days if it stays quiet.",
+      source_note: `${MOCK_NOTE} Built from a thread imported from your connected inbox.`,
+      confidence: 0.9,
+      priority: "now",
+      effort: "10-15 min",
+      effort_bucket: "quick",
+      expected_outcome: "The conversation moves forward instead of going cold.",
+      source_status: "verified",
+      source_ref: threadRef.ref,
+    });
   }
 
   if (oppRef?.opportunity) {

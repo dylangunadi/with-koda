@@ -40,7 +40,8 @@ Students without inherited recruiting networks struggle to identify who to conta
 - Scheduled brief cron (daily at 8 AM UTC, weekly on Mondays), idempotent per user per day
 - Email digest via Resend (falls back to console logging), sent only to confirmed addresses
 - Landing page with marketing copy and waitlist form
-- Integrations (optional, recommended after the first brief, never during onboarding): Google Calendar read-only import and public Greenhouse/Lever job boards
+- Integrations (optional, recommended after the first brief, never during onboarding): Google Calendar read-only import, Gmail recruiting-thread import (query-scoped; subjects, senders, and previews only — never bodies or the full mailbox), and public Greenhouse/Lever job boards
+- Gmail reply loop: threads awaiting the user's reply become follow-up moves with editable reply drafts; "Create Gmail draft" places the draft in the user's own Drafts folder only when they click it — the user always sends it themselves
 - Verified moves: a move built on an imported calendar event or a live job posting is labeled "Verified source" with a link to the real source and an honest checked-ago timestamp; the label is enforced server-side and cannot be produced by the model alone
 - Integration trust rules: read-only access; Koda never sends email, never creates or edits calendar events, never contacts anyone; disconnecting deletes everything Koda imported (moves already on the board keep their copied source link as personal history)
 - Integration management in Settings: connection status, plain-language scope disclosure, Sync now, disconnect-with-deletion; job boards suggested from the user's own target companies with a paste-a-URL fallback (honest framing: public Greenhouse/Lever boards only)

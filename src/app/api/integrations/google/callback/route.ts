@@ -6,12 +6,13 @@ import {
   exchangeCode,
   fetchAccountEmail,
   hasRequiredScopes,
-  GOOGLE_CALENDAR_SCOPES,
+  scopesForService,
+  type GoogleService,
 } from "@/lib/koda/integrations/google/oauth";
 import { isIntegrationsMockMode } from "@/lib/koda/integrations/registry";
 import { createServiceClient } from "@/lib/koda/integrations/serviceClient";
 import { saveTokens } from "@/lib/koda/integrations/tokens";
-import { runCalendarSync } from "@/lib/koda/integrations/sync";
+import { DEFAULT_GMAIL_QUERY, runIntegrationSync } from "@/lib/koda/integrations/sync";
 import { logKodaEvent } from "@/lib/koda/events";
 import type { Integration } from "@/lib/types";
 
@@ -32,6 +33,7 @@ function settingsRedirect(origin: string, result: string): NextResponse {
   const path = "/api/integrations/google";
   response.cookies.delete({ name: "koda_oauth_state", path });
   response.cookies.delete({ name: "koda_oauth_verifier", path });
+  response.cookies.delete({ name: "koda_oauth_service", path });
   return response;
 }
 
@@ -46,17 +48,20 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login", url.origin));
   }
 
+  const cookieStore = await cookies();
+  const serviceCookie = cookieStore.get("koda_oauth_service")?.value;
+  const serviceValue = serviceCookie ? verifySignedValue(serviceCookie) : null;
+  const service: GoogleService = serviceValue === "gmail" ? "gmail" : "calendar";
+  const provider = service === "gmail" ? "gmail" : "google_calendar";
+
   // User cancelled on the consent screen: calm notice, zero rows written.
   if (url.searchParams.get("error")) {
-    logKodaEvent(supabase, user.id, "integration_connect_cancelled", {
-      provider: "google_calendar",
-    });
+    logKodaEvent(supabase, user.id, "integration_connect_cancelled", { provider });
     return settingsRedirect(url.origin, "cancelled");
   }
 
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const cookieStore = await cookies();
   const stateCookie = cookieStore.get("koda_oauth_state")?.value;
   const verifierCookie = cookieStore.get("koda_oauth_verifier")?.value;
 
@@ -79,8 +84,9 @@ export async function GET(request: Request) {
     accessToken = "mock-access-token";
     refreshToken = "mock-refresh-token";
     expiresIn = 3600;
-    grantedScope = GOOGLE_CALENDAR_SCOPES.join(" ");
-    accountLabel = "Sample calendar (offline mode)";
+    grantedScope = scopesForService(service).join(" ");
+    accountLabel =
+      service === "gmail" ? "student@example.com (offline mode)" : "Sample calendar (offline mode)";
   } else {
     try {
       const tokens = await exchangeCode({ code, codeVerifier });
@@ -93,7 +99,7 @@ export async function GET(request: Request) {
       return settingsRedirect(url.origin, "error");
     }
 
-    if (!hasRequiredScopes(grantedScope)) {
+    if (!hasRequiredScopes(grantedScope, service)) {
       return settingsRedirect(url.origin, "scope_missing");
     }
     accountLabel = await fetchAccountEmail(accessToken);
@@ -106,10 +112,13 @@ export async function GET(request: Request) {
     .upsert(
       {
         user_id: user.id,
-        provider: "google_calendar",
+        provider,
         status: "connected",
         account_label: accountLabel,
         scopes: grantedScope.split(/\s+/).filter(Boolean),
+        // Gmail import is scoped to a recruiting search query, stored where
+        // the user can see and tighten it. Never the whole mailbox.
+        ...(provider === "gmail" ? { config: { queries: [DEFAULT_GMAIL_QUERY] } } : {}),
         last_sync_error: null,
         updated_at: new Date().toISOString(),
       },
@@ -123,9 +132,9 @@ export async function GET(request: Request) {
     return settingsRedirect(url.origin, "error");
   }
 
-  const service = createServiceClient();
+  const serviceClient = createServiceClient();
   try {
-    await saveTokens(service, {
+    await saveTokens(serviceClient, {
       integrationId: integrationRow.id,
       userId: user.id,
       accessToken,
@@ -139,11 +148,15 @@ export async function GET(request: Request) {
     return settingsRedirect(url.origin, "error");
   }
 
-  logKodaEvent(supabase, user.id, "integration_connected", { provider: "google_calendar" });
+  logKodaEvent(supabase, user.id, "integration_connected", { provider });
 
   // Inline initial sync so the settings page shows data immediately. Failure
   // here is non-fatal: nightly cron and "Sync now" both retry.
-  const initialSync = await runCalendarSync(service, integrationRow as Integration, "initial");
+  const initialSync = await runIntegrationSync(
+    serviceClient,
+    integrationRow as Integration,
+    "initial"
+  );
   if (!initialSync.ok) {
     console.warn("[integrations] initial sync failed:", initialSync.error);
   }

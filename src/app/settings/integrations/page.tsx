@@ -36,18 +36,24 @@ export default async function IntegrationsSettingsPage({
 
   const integrations = (integrationRows ?? []) as Integration[];
   const calendar = integrations.find((i) => i.provider === "google_calendar") ?? null;
+  const gmail = integrations.find((i) => i.provider === "gmail") ?? null;
   const jobBoards = integrations.find((i) => i.provider === "job_boards") ?? null;
 
-  let lastCalendarRun: IntegrationSyncRun | null = null;
-  if (calendar) {
+  async function lastRun(integration: Integration | null): Promise<IntegrationSyncRun | null> {
+    if (!integration) return null;
     const { data: runRows } = await supabase
       .from("integration_sync_runs")
       .select("*")
-      .eq("integration_id", calendar.id)
+      .eq("integration_id", integration.id)
       .order("started_at", { ascending: false })
       .limit(1);
-    lastCalendarRun = (runRows?.[0] as IntegrationSyncRun) ?? null;
+    return (runRows?.[0] as IntegrationSyncRun) ?? null;
   }
+
+  const [lastCalendarRun, lastGmailRun] = await Promise.all([
+    lastRun(calendar),
+    lastRun(gmail),
+  ]);
 
   return (
     <div className="page-enter">
@@ -70,7 +76,7 @@ export default async function IntegrationsSettingsPage({
       </div>
 
       {connect === "ok" && (
-        <NoticeCard tone="ok" text="Google Calendar is connected. Koda pulled your upcoming events." />
+        <NoticeCard tone="ok" text="Connected. Koda pulled your data and will keep it fresh." />
       )}
       {connect === "cancelled" && (
         <NoticeCard tone="muted" text="No problem. Nothing was connected and nothing was saved." />
@@ -78,15 +84,16 @@ export default async function IntegrationsSettingsPage({
       {connect === "scope_missing" && (
         <NoticeCard
           tone="error"
-          text="Calendar access was not granted, so Koda could not connect. Reconnect and allow read-only calendar access."
+          text="The needed access was not granted, so Koda could not connect. Reconnect and allow the read access shown on the consent screen."
         />
       )}
       {connect === "error" && (
-        <NoticeCard tone="error" text="Something went wrong connecting Google Calendar. Try again." />
+        <NoticeCard tone="error" text="Something went wrong connecting to Google. Try again." />
       )}
 
       <div className="space-y-8">
-        <IntegrationCard integration={calendar} lastRun={lastCalendarRun} />
+        <IntegrationCard provider="google_calendar" integration={calendar} lastRun={lastCalendarRun} />
+        <IntegrationCard provider="gmail" integration={gmail} lastRun={lastGmailRun} />
         <JobBoardsManager
           integration={jobBoards}
           targetCompanies={profileRow?.target_companies ?? []}

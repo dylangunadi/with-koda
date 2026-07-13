@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash, randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { signValue } from "@/lib/koda/integrations/crypto";
-import { buildAuthUrl } from "@/lib/koda/integrations/google/oauth";
+import { buildAuthUrl, type GoogleService } from "@/lib/koda/integrations/google/oauth";
 import { isIntegrationsMockMode } from "@/lib/koda/integrations/registry";
 
 /**
@@ -26,6 +26,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login", url.origin));
   }
 
+  const service: GoogleService =
+    url.searchParams.get("service") === "gmail" ? "gmail" : "calendar";
+
   const state = randomBytes(16).toString("base64url");
   const codeVerifier = randomBytes(32).toString("base64url");
   const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
@@ -35,7 +38,7 @@ export async function GET(request: Request) {
         `/api/integrations/google/callback?code=mock&state=${encodeURIComponent(state)}`,
         url.origin
       ).toString()
-    : buildAuthUrl({ state, codeChallenge });
+    : buildAuthUrl({ state, codeChallenge, service });
 
   const response = NextResponse.redirect(target);
   const cookieOptions = {
@@ -47,5 +50,8 @@ export async function GET(request: Request) {
   };
   response.cookies.set("koda_oauth_state", signValue(state), cookieOptions);
   response.cookies.set("koda_oauth_verifier", signValue(codeVerifier), cookieOptions);
+  // Which Google service this flow is for; the callback trusts only this
+  // signed cookie, never a query parameter Google echoes back.
+  response.cookies.set("koda_oauth_service", signValue(service), cookieOptions);
   return response;
 }

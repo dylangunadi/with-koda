@@ -12,21 +12,53 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar, RefreshCw, Unplug } from "lucide-react";
+import { Calendar, Mail, RefreshCw, Unplug } from "lucide-react";
 import type { Integration, IntegrationSyncRun } from "@/lib/types";
 
+const SERVICE_COPY = {
+  google_calendar: {
+    heading: "Google Calendar",
+    connectService: "calendar",
+    connectLabel: "Connect Google Calendar",
+    reconnectLabel: "Reconnect Google Calendar",
+    description:
+      "Read-only access to your calendar. Koda uses it to prep you before coffee chats, recruiter calls, and interviews, and to suggest follow-ups after them. Koda never creates or changes events.",
+    reconnectNote:
+      "Google needs you to sign in again to keep syncing. Your data is untouched, and reconnecting resumes where it left off.",
+    disconnectTitle: "Disconnect Google Calendar?",
+    disconnectBody:
+      "Koda will delete every calendar event it imported and revoke its access. Moves you already received stay on your board, but they lose their live source links. You can reconnect anytime.",
+  },
+  gmail: {
+    heading: "Gmail",
+    connectService: "gmail",
+    connectLabel: "Connect Gmail",
+    reconnectLabel: "Reconnect Gmail",
+    description:
+      "Koda imports only threads matching your recruiting search (subjects, senders, and previews; never full mailbox contents), spots conversations waiting on your reply, and prepares reply drafts. Creating a Gmail draft happens only when you click it on a move, and Koda can never send email.",
+    reconnectNote:
+      "Google needs you to sign in again to keep syncing. Your data is untouched, and reconnecting resumes where it left off.",
+    disconnectTitle: "Disconnect Gmail?",
+    disconnectBody:
+      "Koda will delete every thread it imported and revoke its access. Moves you already received stay on your board, but they lose their live source links. You can reconnect anytime.",
+  },
+} as const;
+
 /**
- * Google Calendar connection card. Three honest states: not connected,
- * connected, reconnect needed. Reconnect is a normal state (Google Testing
- * mode expires refresh tokens weekly), never a dead end.
+ * Google service connection card (Calendar or Gmail). Three honest states:
+ * not connected, connected, reconnect needed. Reconnect is a normal state
+ * (Google Testing mode expires refresh tokens weekly), never a dead end.
  */
 export function IntegrationCard({
+  provider,
   integration,
   lastRun,
 }: {
+  provider: "google_calendar" | "gmail";
   integration: Integration | null;
   lastRun: IntegrationSyncRun | null;
 }) {
+  const copy = SERVICE_COPY[provider];
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -40,7 +72,7 @@ export function IntegrationCard({
       const res = await fetch("/api/integrations/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: "google_calendar" }),
+        body: JSON.stringify({ provider }),
       });
       if (res.status === 429) {
         toast.message("Synced very recently. Give it a couple of minutes.");
@@ -48,11 +80,11 @@ export function IntegrationCard({
         const body = await res.json().catch(() => ({}));
         toast.error(
           body.reconnectRequired
-            ? "Google needs you to reconnect this calendar."
+            ? "Google needs you to reconnect this account."
             : "Sync failed. Koda will retry overnight."
         );
       } else {
-        toast.success("Calendar synced");
+        toast.success(`${copy.heading} synced`);
       }
       router.refresh();
     } finally {
@@ -63,7 +95,11 @@ export function IntegrationCard({
   async function disconnect() {
     setDisconnecting(true);
     try {
-      const res = await fetch("/api/integrations/google/disconnect", { method: "POST" });
+      const res = await fetch("/api/integrations/google/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
       if (!res.ok) {
         toast.error("Could not disconnect. Try again.");
         return;
@@ -78,12 +114,16 @@ export function IntegrationCard({
 
   return (
     <div>
-      <p className="font-system text-primary mb-3">Google Calendar</p>
+      <p className="font-system text-primary mb-3">{copy.heading}</p>
       <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-muted">
-              <Calendar className="size-4 text-muted-foreground" aria-hidden />
+              {provider === "gmail" ? (
+                <Mail className="size-4 text-muted-foreground" aria-hidden />
+              ) : (
+                <Calendar className="size-4 text-muted-foreground" aria-hidden />
+              )}
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">
@@ -96,11 +136,7 @@ export function IntegrationCard({
                   <span className="font-normal text-muted-foreground"> · {integration.account_label}</span>
                 )}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                Read-only access to your calendar. Koda uses it to prep you before
-                coffee chats, recruiter calls, and interviews, and to suggest
-                follow-ups after them. Koda never creates or changes events.
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{copy.description}</p>
               {integration?.last_synced_at && (
                 <p className="mt-1 font-system text-muted-foreground">
                   Last synced {new Date(integration.last_synced_at).toLocaleString()}
@@ -108,10 +144,7 @@ export function IntegrationCard({
                 </p>
               )}
               {needsReconnect && (
-                <p className="mt-1 text-sm text-amber-700 dark:text-amber-500">
-                  Google needs you to sign in again to keep syncing. Your data
-                  is untouched, and reconnecting resumes where it left off.
-                </p>
+                <p className="mt-1 text-sm text-amber-700 dark:text-amber-500">{copy.reconnectNote}</p>
               )}
             </div>
           </div>
@@ -120,10 +153,10 @@ export function IntegrationCard({
         <div className="flex flex-wrap items-center gap-2">
           {!integration || needsReconnect ? (
             <a
-              href="/api/integrations/google/connect"
+              href={`/api/integrations/google/connect?service=${copy.connectService}`}
               className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
             >
-              {needsReconnect ? "Reconnect Google Calendar" : "Connect Google Calendar"}
+              {needsReconnect ? copy.reconnectLabel : copy.connectLabel}
             </a>
           ) : (
             <Button
@@ -155,12 +188,8 @@ export function IntegrationCard({
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Disconnect Google Calendar?</DialogTitle>
-            <DialogDescription>
-              Koda will delete every calendar event it imported and revoke its
-              access. Moves you already received stay on your board, but they
-              lose their live source links. You can reconnect anytime.
-            </DialogDescription>
+            <DialogTitle>{copy.disconnectTitle}</DialogTitle>
+            <DialogDescription>{copy.disconnectBody}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirming(false)} disabled={disconnecting}>

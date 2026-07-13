@@ -77,6 +77,7 @@ export interface RecruitingMove {
   source_status: MoveSourceStatus;
   external_event_id: string | null;
   external_opportunity_id: string | null;
+  external_thread_id: string | null;
   source_url: string | null;
   source_fetched_at: string | null;
   created_at: string;
@@ -188,11 +189,13 @@ export interface AgentContext {
   relationships: Relationship[];
   calendar: CalendarContext;
   opportunities: ExternalOpportunity[];
+  /** Imported threads awaiting the user's reply, capped small. */
+  threads: ExternalThread[];
 }
 
 // --- Integration types ---
 
-export type IntegrationProvider = "google_calendar" | "job_boards";
+export type IntegrationProvider = "google_calendar" | "job_boards" | "gmail";
 export type IntegrationStatus = "connected" | "error" | "pending";
 
 /** A configured job board on the job_boards integration. */
@@ -212,7 +215,7 @@ export interface Integration {
   status: IntegrationStatus;
   account_label: string | null;
   scopes: string[];
-  config: { calendar_ids?: string[]; boards?: JobBoardConfig[] };
+  config: { calendar_ids?: string[]; boards?: JobBoardConfig[]; queries?: string[] };
   sync_cursor: string | null;
   last_synced_at: string | null;
   last_sync_error: string | null;
@@ -275,6 +278,27 @@ export interface ExternalOpportunity {
   last_seen_at: string;
   fetched_at: string;
   verification_status: OpportunityVerification;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExternalThread {
+  id: string;
+  user_id: string;
+  integration_id: string;
+  provider: string;
+  external_id: string;
+  subject: string | null;
+  snippet: string | null;
+  participants: ExternalEventAttendee[];
+  last_from_email: string | null;
+  last_message_at: string | null;
+  message_count: number;
+  needs_reply: boolean;
+  relationship_id: string | null;
+  permalink: string | null;
+  source_updated_at: string | null;
+  fetched_at: string;
   created_at: string;
   updated_at: string;
 }

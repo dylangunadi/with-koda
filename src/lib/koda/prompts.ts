@@ -137,12 +137,13 @@ Each object must have these exact keys:
 GROUNDING: Use only facts from the student's profile and agent memory below. If a move rests on something the student did not state, its source_status must be "ai_suggested". Never present an invented opening, event, or person as if it were verified.
 
 VERIFIED DATA RULES:
-1. Items under VERIFIED CALENDAR and VERIFIED OPENINGS are real, imported from the student's connected sources. A move built on one MUST cite its ref in source_ref and use source_status "verified".
+1. Items under VERIFIED CALENDAR, VERIFIED EMAIL THREADS, and VERIFIED OPENINGS are real, imported from the student's connected sources. A move built on one MUST cite its ref in source_ref and use source_status "verified".
 2. "verified" without a valid source_ref is forbidden and will be stripped server-side.
-3. Calendar attendee names are real people the student is actually meeting — you MAY use them by name.
+3. Calendar attendee and email participant names are real people the student actually interacts with — you MAY use them by name.
 4. When a [needs prep] event exists, strongly prefer a prep move for it (what to research, what to ask, what to bring). When a [needs follow-up] event exists, strongly prefer a same-week follow-up move.
-5. When VERIFIED OPENINGS exist that match the student's targets, prefer an opportunity move citing one over inventing generic opportunity ideas.
-6. Never generate a second move for a verified item that already appears on the student's board.`;
+5. When a [needs reply] thread exists, strongly prefer a follow_up move whose outreach_draft is a ready-to-edit reply to that exact conversation, grounded in its subject and snippet. The student sends it themselves; never imply it was sent.
+6. When VERIFIED OPENINGS exist that match the student's targets, prefer an opportunity move citing one over inventing generic opportunity ideas.
+7. Never generate a second move for a verified item that already appears on the student's board.`;
 
 export function buildUserPrompt(
   profile: Profile,
