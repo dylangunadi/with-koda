@@ -1,87 +1,150 @@
 import { test, expect } from "@playwright/test";
 import { uniqueEmail } from "./helpers/db";
 import { signupViaUi } from "./helpers/auth";
-import { installFakeSpeech } from "./helpers/speech";
+import { installFakeSpeech, removeSpeech } from "./helpers/speech";
 
-test("browser without speech support gets a fully usable text flow with no mic button", async ({
+declare global {
+  interface Window {
+    __speechInterim: (t: string) => void;
+    __speechFinal: (t: string, confidence?: number) => void;
+    __speechError: (e: string) => void;
+    __speechStartCount: number;
+    __spokenTexts: string[];
+    __synthCancelled: boolean;
+    __holdSpeech: boolean;
+    __finishSpeaking: () => void;
+  }
+}
+
+test("browser without speech support gets a fully usable text flow with no call controls", async ({
   page,
 }) => {
-  // Chromium ships webkitSpeechRecognition; remove both globals to simulate a
-  // browser with no speech support so real feature detection hides the mic.
-  await page.addInitScript(() => {
-    const w = window as unknown as Record<string, unknown>;
-    delete w.SpeechRecognition;
-    delete w.webkitSpeechRecognition;
-  });
+  await removeSpeech(page);
   await signupViaUi(page, uniqueEmail("novoice"));
   await expect(page.getByLabel("Message Koda")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Speak your answer" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Start call" })).toHaveCount(0);
 
-  // Text path works.
   await page.getByLabel("Message Koda").fill("I'm Casey, a senior at UCLA");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
 });
 
-test("microphone denial keeps typed text and the text flow fully usable", async ({ page }) => {
+test("a call turn is auto-detected, spoken back, and the mic state is honest", async ({
+  page,
+}) => {
+  await installFakeSpeech(page);
+  await signupViaUi(page, uniqueEmail("callflow"));
+
+  // Start call: automatic listening, visible mic indicator.
+  await page.getByRole("button", { name: "Start call" }).click();
+  await expect(page.getByText("Listening", { exact: true })).toBeVisible();
+  await expect(page.getByText("Mic on")).toBeVisible();
+
+  // Live interim transcript renders while speaking.
+  await page.evaluate(() => window.__speechInterim("i'm jordan a junior"));
+  await expect(page.getByText("i'm jordan a junior")).toBeVisible();
+
+  // Final result + pause threshold => automatic turn submission.
+  await page.evaluate(() => window.__speechFinal("I'm Jordan, a junior at UC Berkeley", 0.95));
+  await expect(page.getByText("I'm Jordan, a junior at UC Berkeley")).toBeVisible({
+    timeout: 5000,
+  });
+  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
+
+  // The reply was spoken via TTS and the call returned to listening.
+  const spoken = await page.evaluate(() => window.__spokenTexts.join(" "));
+  expect(spoken).toContain("Jordan");
+  await expect(page.getByText("Listening", { exact: true })).toBeVisible({ timeout: 10000 });
+
+  // Mute stops the mic truthfully and recognition does not auto-restart.
+  await page.getByRole("button", { name: "Mute" }).click();
+  await expect(page.getByText("Muted")).toBeVisible();
+  await expect(page.getByText("Mic on")).toHaveCount(0);
+  await page.getByRole("button", { name: "Unmute" }).click();
+  await expect(page.getByText("Mic on")).toBeVisible();
+
+  // End call stops listening cleanly; text path continues.
+  await page.getByRole("button", { name: "End call" }).click();
+  await expect(page.getByText("Mic on")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Call again" })).toBeVisible();
+  await page.getByLabel("Message Koda").fill("Product management roles");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("2 of 9 covered")).toBeVisible({ timeout: 20000 });
+});
+
+test("interrupting Koda cuts speech immediately", async ({ page }) => {
+  await installFakeSpeech(page);
+  await signupViaUi(page, uniqueEmail("bargein"));
+
+  await page.getByRole("button", { name: "Start call" }).click();
+  await expect(page.getByText("Listening", { exact: true })).toBeVisible();
+
+  // Hold utterances open so Koda is mid-speech when the user interrupts.
+  await page.evaluate(() => {
+    window.__holdSpeech = true;
+  });
+  await page.evaluate(() => window.__speechFinal("I'm Riley, a junior at Stanford", 0.95));
+  await expect(page.getByText("Koda is speaking")).toBeVisible({ timeout: 20000 });
+
+  // Sustained user speech during TTS cancels it and returns to listening.
+  await page.evaluate(() => window.__speechInterim("wait actually I have a question"));
+  await expect
+    .poll(async () => page.evaluate(() => window.__synthCancelled))
+    .toBe(true);
+  await expect(page.getByText("Listening", { exact: true })).toBeVisible();
+});
+
+test("low-confidence transcripts go to the composer for correction, not straight to Koda", async ({
+  page,
+}) => {
+  await installFakeSpeech(page);
+  await signupViaUi(page, uniqueEmail("lowconf"));
+
+  await page.getByRole("button", { name: "Start call" }).click();
+  await expect(page.getByText("Listening", { exact: true })).toBeVisible();
+
+  await page.evaluate(() => window.__speechFinal("I'm Morrigan a junior at you sea berkeley", 0.2));
+  await expect(page.getByText("Check what Koda heard, then send.")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByLabel("Message Koda")).toHaveValue(
+    "I'm Morrigan a junior at you sea berkeley"
+  );
+  // Nothing was submitted automatically.
+  await expect(page.getByText("0 of 9 covered")).toBeVisible();
+
+  // The user corrects it and sends; the corrected text is the turn.
+  await page.getByLabel("Message Koda").fill("I'm Morgan, a junior at UC Berkeley");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
+});
+
+test("microphone denial ends the call safely and keeps text fully usable", async ({ page }) => {
   await installFakeSpeech(page);
   await signupViaUi(page, uniqueEmail("micdenied"));
 
-  // Type first, then attempt voice.
   await page.getByLabel("Message Koda").fill("I'm Riley");
-  await page.getByRole("button", { name: "Speak your answer" }).click();
-  await expect(page.getByText(/Listening/)).toBeVisible();
-  await page.evaluate(() =>
-    (window as unknown as { __speechError: (e: string) => void }).__speechError("not-allowed")
-  );
+  await page.getByRole("button", { name: "Start call" }).click();
+  await page.evaluate(() => window.__speechError("not-allowed"));
 
-  // Denial message, disabled mic, typed text untouched.
   await expect(page.getByText(/Microphone is blocked/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Microphone blocked" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start call" })).toHaveCount(0);
+  // Typed text is untouched and the flow continues by text.
   await expect(page.getByLabel("Message Koda")).toHaveValue("I'm Riley");
-
-  // Onboarding continues by text.
   await page.getByLabel("Message Koda").fill("I'm Riley, a junior at Stanford");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
 });
 
-test("voice transcript appends to typed text, is editable, and sends as voice input", async ({
-  page,
-}) => {
+test("user turns appear instantly and Koda's reply streams in", async ({ page }) => {
   await installFakeSpeech(page);
-  await signupViaUi(page, uniqueEmail("voice"));
+  await signupViaUi(page, uniqueEmail("optimistic"));
 
-  await page.getByLabel("Message Koda").fill("I'm Morgan,");
-  await page.getByRole("button", { name: "Speak your answer" }).click();
-  await expect(page.getByText(/Listening/)).toBeVisible();
-  await page.evaluate(() =>
-    (window as unknown as { __speechInterim: (t: string) => void }).__speechInterim("a sophom")
-  );
-  await expect(page.getByText(/Listening: a sophom/)).toBeVisible();
-  await page.evaluate(() =>
-    (window as unknown as { __speechEmit: (t: string) => void }).__speechEmit(
-      "a sophomore at MIT"
-    )
-  );
-
-  // Appended, not replaced; still editable before sending.
-  await expect(page.getByLabel("Message Koda")).toHaveValue("I'm Morgan, a sophomore at MIT");
-
-  const talkResponse = page.waitForResponse(
-    (res) => res.url().includes("/api/talk") && res.request().method() === "POST"
-  );
+  const message = "I'm Sam, a sophomore at Cal";
+  await page.getByLabel("Message Koda").fill(message);
   await page.getByRole("button", { name: "Send" }).click();
-  const response = await talkResponse;
-  expect(response.request().postDataJSON().inputMode).toBe("voice");
-  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 15000 });
 
-  // A speech error after a successful voice turn must not lose new typed text.
-  await page.getByLabel("Message Koda").fill("Product roles");
-  await page.getByRole("button", { name: "Speak your answer" }).click();
-  await page.evaluate(() =>
-    (window as unknown as { __speechError: (e: string) => void }).__speechError("network")
-  );
-  await expect(page.getByText(/Could not hear that/)).toBeVisible();
-  await expect(page.getByLabel("Message Koda")).toHaveValue("Product roles");
+  // Optimistic: the user bubble is visible immediately and the composer
+  // cleared, before the reply completes.
+  await expect(page.getByText(message)).toBeVisible();
+  await expect(page.getByLabel("Message Koda")).toHaveValue("");
+  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
 });

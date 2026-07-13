@@ -58,13 +58,18 @@ test("duplicate rapid submission does not create a second turn", async ({ page }
   };
 
   // Replay the exact same message immediately via the API (page.request
-  // shares the session cookies).
+  // shares the session cookies). The route streams; the last data frame is
+  // the final payload.
   const second = await page.request.post("/api/talk", {
     data: { message: "I'm Alex at Stanford", inputMode: "text" },
   });
   const before = await countMessages();
   expect(second.ok()).toBeTruthy();
-  expect((await second.json()).duplicate).toBe(true);
+  const finalFrame = (await second.text())
+    .split("\n")
+    .filter((l) => l.startsWith("data:"))
+    .pop();
+  expect(JSON.parse(finalFrame!.slice(5)).duplicate).toBe(true);
   expect(await countMessages()).toBe(before);
 });
 

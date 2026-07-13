@@ -24,6 +24,10 @@ export interface OnboardingTurnInput {
   missing: (keyof OnboardingExtracted)[];
   history: { role: "user" | "koda"; content: string }[];
   userMessage: string;
+  /** Called with reply-text fragments as they become available, so the UI can
+   * render (and speak) the response before the turn completes. Optional: the
+   * full reply is always returned in the result regardless. */
+  onDelta?: (text: string) => void;
 }
 
 export interface OnboardingTurnResult {
@@ -83,6 +87,8 @@ export interface OngoingTurnInput {
   userMessage: string;
   history: { role: "user" | "koda"; content: string }[];
   grounding: OngoingGrounding;
+  /** Streaming reply fragments; see OnboardingTurnInput.onDelta. */
+  onDelta?: (text: string) => void;
 }
 
 export interface OngoingTurnResult {

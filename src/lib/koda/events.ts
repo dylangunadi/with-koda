@@ -23,6 +23,7 @@ export type KodaEventName =
   | "first_brief_generation_failed"
   | "voice_input_used"
   | "voice_permission_denied"
+  | "turn_latency"
   | "ai_error"
   | "move_edited"
   | "move_accepted"

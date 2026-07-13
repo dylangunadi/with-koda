@@ -143,10 +143,18 @@ test("asking for the next move uses saved data and stays concrete", async ({ pag
   });
   await expect(page.getByText("Save to memory?")).toHaveCount(0);
 
+  // Streaming shows text before the turn persists, so poll for the event.
   const db = adminClient();
-  const { data: events } = await db
-    .from("koda_events")
-    .select("event_name")
-    .eq("user_id", user.id);
-  expect((events ?? []).map((e) => e.event_name)).toContain("next_move_requested");
+  await expect
+    .poll(
+      async () => {
+        const { data: events } = await db
+          .from("koda_events")
+          .select("event_name")
+          .eq("user_id", user.id);
+        return (events ?? []).map((e) => e.event_name);
+      },
+      { timeout: 10000 }
+    )
+    .toContain("next_move_requested");
 });

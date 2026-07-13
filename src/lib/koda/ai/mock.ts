@@ -24,6 +24,17 @@ import type {
 
 const MOCK_NOTE = "Offline sample mode: grounded only in your onboarding answers.";
 
+/** Deterministic streaming: emit the reply in small word groups with short
+ * pauses, so the streaming pipeline is exercised end to end offline. */
+async function streamReply(reply: string, onDelta?: (text: string) => void): Promise<void> {
+  if (!onDelta) return;
+  const words = reply.split(" ");
+  for (let i = 0; i < words.length; i += 3) {
+    onDelta((i > 0 ? " " : "") + words.slice(i, i + 3).join(" "));
+    await new Promise((resolve) => setTimeout(resolve, 12));
+  }
+}
+
 function splitList(text: string): string[] {
   return text
     .split(/,|\band\b|\bor\b|;/i)
@@ -124,19 +135,27 @@ function acknowledgment(key: keyof OnboardingExtracted, delta: Partial<Onboardin
 async function onboardingTurn(input: OnboardingTurnInput): Promise<OnboardingTurnResult> {
   const target = input.missing[0];
   if (!target) {
-    return {
-      reply:
-        "I have everything I need. Review what I learned below, fix anything that is off, and I will build your first brief.",
-      extracted: {},
-    };
+    const reply =
+      "I have everything I need. Review what I learned below, fix anything that is off, and I will build your first brief.";
+    await streamReply(reply, input.onDelta);
+    return { reply, extracted: {} };
   }
-  const delta = extractForField(target, input.userMessage);
+  // Skips and uncertainty are answers too: record them and move on.
+  const skipping = /^(skip|pass|not sure|no idea|i don'?t know|dunno|nothing( yet)?|none yet)\b/i.test(
+    input.userMessage.trim()
+  );
+  const delta = skipping
+    ? ({ [target]: ["target_roles", "target_companies", "locations"].includes(target)
+        ? ["not sure yet"]
+        : "not sure yet" } as Partial<OnboardingExtracted>)
+    : extractForField(target, input.userMessage);
   const merged = mergeExtracted(input.extracted, delta);
   const remaining = missingFields(merged);
   const ack = acknowledgment(target, delta);
   const reply = remaining.length
     ? `${ack} ${questionFor(remaining[0])}`
     : `${ack} That is everything I need. Review what I learned below, fix anything that is off, and confirm to get your first brief.`;
+  await streamReply(reply, input.onDelta);
   return { reply, extracted: delta };
 }
 
@@ -207,6 +226,12 @@ function extractProfileDiff(fullMessage: string): ProfileDiffEntry[] {
 }
 
 async function ongoingTurn(input: OngoingTurnInput): Promise<OngoingTurnResult> {
+  const result = await computeOngoingTurn(input);
+  await streamReply(result.reply, input.onDelta);
+  return result;
+}
+
+async function computeOngoingTurn(input: OngoingTurnInput): Promise<OngoingTurnResult> {
   const message = input.userMessage;
 
   if (NEXT_MOVE_MARKERS.test(message)) {

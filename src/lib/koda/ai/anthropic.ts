@@ -26,6 +26,75 @@ import { KodaAiError, UPDATABLE_PROFILE_FIELDS } from "./provider";
 
 const MODEL = "claude-sonnet-4-5";
 
+/** Separates spoken reply text from the trailing JSON metadata in streaming
+ * turn responses. Kept out of user-visible deltas by holding back a tail. */
+export const DATA_SENTINEL = "<<<DATA>>>";
+
+/**
+ * Stream a turn response in the reply-first protocol: plain reply text, then
+ * DATA_SENTINEL, then a JSON object. Reply fragments are forwarded to onDelta
+ * as they arrive (minus a held-back tail so a split sentinel never leaks);
+ * returns the full reply and the parsed metadata object.
+ */
+async function streamTurn(
+  system: string,
+  prompt: string,
+  onDelta?: (text: string) => void
+): Promise<{ reply: string; data: Record<string, unknown> }> {
+  const anthropic = client();
+  const stream = anthropic.messages.stream({
+    model: MODEL,
+    max_tokens: 1000,
+    system,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  let buffer = "";
+  let emitted = 0;
+  let sentinelSeen = false;
+  const HOLDBACK = DATA_SENTINEL.length;
+
+  stream.on("text", (text) => {
+    if (sentinelSeen) return;
+    buffer += text;
+    const sentinelAt = buffer.indexOf(DATA_SENTINEL);
+    if (sentinelAt >= 0) {
+      sentinelSeen = true;
+      if (sentinelAt > emitted) onDelta?.(buffer.slice(emitted, sentinelAt));
+      emitted = sentinelAt;
+      return;
+    }
+    // Emit everything except a sentinel-sized tail that might be a split marker.
+    const safeEnd = Math.max(emitted, buffer.length - HOLDBACK);
+    if (safeEnd > emitted) {
+      onDelta?.(buffer.slice(emitted, safeEnd));
+      emitted = safeEnd;
+    }
+  });
+
+  await stream.finalMessage();
+  const full = buffer;
+  const sentinelAt = full.indexOf(DATA_SENTINEL);
+  const reply = (sentinelAt >= 0 ? full.slice(0, sentinelAt) : full).trim();
+  if (!sentinelSeen && reply && emitted < (sentinelAt >= 0 ? sentinelAt : full.length)) {
+    onDelta?.(full.slice(emitted, sentinelAt >= 0 ? sentinelAt : full.length));
+  }
+  if (!reply) {
+    throw new KodaAiError("Model returned no reply");
+  }
+  let data: Record<string, unknown> = {};
+  if (sentinelAt >= 0) {
+    try {
+      data = parseJson(full.slice(sentinelAt + DATA_SENTINEL.length)) as Record<string, unknown>;
+    } catch {
+      // Metadata is best-effort: a reply with unparseable extraction still
+      // reads correctly; the server-side checklist keeps state consistent.
+      data = {};
+    }
+  }
+  return { reply: reply.slice(0, 2000), data };
+}
+
 const VALID_TYPES: MoveType[] = [
   "opportunity",
   "person_to_contact",
@@ -143,20 +212,12 @@ function sanitizeExtracted(value: unknown): Partial<OnboardingExtracted> {
 }
 
 async function onboardingTurn(input: OnboardingTurnInput): Promise<OnboardingTurnResult> {
-  const anthropic = client();
-  const result = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 800,
-    system: ONBOARDING_TURN_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildOnboardingTurnPrompt(input) }],
-  });
-  const raw = result.content[0]?.type === "text" ? result.content[0].text : "{}";
-  const parsed = parseJson(raw) as Record<string, unknown>;
-  const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : "";
-  if (!reply) {
-    throw new KodaAiError("Model returned no reply");
-  }
-  return { reply: reply.slice(0, 2000), extracted: sanitizeExtracted(parsed.extracted) };
+  const { reply, data } = await streamTurn(
+    ONBOARDING_TURN_SYSTEM_PROMPT,
+    buildOnboardingTurnPrompt(input),
+    input.onDelta
+  );
+  return { reply, extracted: sanitizeExtracted(data.extracted) };
 }
 
 const VALID_INTENTS: OngoingIntent[] = ["add_context", "update_profile", "ask_next_move", "chat"];
@@ -223,23 +284,15 @@ function sanitizeProposal(value: unknown): OngoingProposal | undefined {
 }
 
 async function ongoingTurn(input: OngoingTurnInput): Promise<OngoingTurnResult> {
-  const anthropic = client();
-  const result = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1000,
-    system: ONGOING_TURN_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildOngoingTurnPrompt(input) }],
-  });
-  const raw = result.content[0]?.type === "text" ? result.content[0].text : "{}";
-  const parsed = parseJson(raw) as Record<string, unknown>;
-  const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : "";
-  if (!reply) {
-    throw new KodaAiError("Model returned no reply");
-  }
-  const intent = VALID_INTENTS.includes(parsed.intent as OngoingIntent)
-    ? (parsed.intent as OngoingIntent)
+  const { reply, data } = await streamTurn(
+    ONGOING_TURN_SYSTEM_PROMPT,
+    buildOngoingTurnPrompt(input),
+    input.onDelta
+  );
+  const intent = VALID_INTENTS.includes(data.intent as OngoingIntent)
+    ? (data.intent as OngoingIntent)
     : "chat";
-  return { reply: reply.slice(0, 2000), intent, proposal: sanitizeProposal(parsed.proposal) };
+  return { reply, intent, proposal: sanitizeProposal(data.proposal) };
 }
 
 export const anthropicProvider: KodaAI = {

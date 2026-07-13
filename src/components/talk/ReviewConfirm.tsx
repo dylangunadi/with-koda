@@ -121,7 +121,9 @@ export function ReviewConfirm({ extracted, onDone }: ReviewConfirmProps) {
           Here is what Koda learned
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Fix anything that is off. Koda builds your first brief from this.
+          Fix anything that is off. Koda uses this to pick who you should talk
+          to, what to send, and what to do next; it stays private to you, and
+          Koda never contacts anyone on your behalf.
         </p>
       </div>
 

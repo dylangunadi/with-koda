@@ -13,15 +13,24 @@ import type {
 
 const MAX_MESSAGE_LENGTH = 4000;
 const DUPLICATE_WINDOW_MS = 5000;
+const MAX_TURN_ID_LENGTH = 64;
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
+type StreamEvent =
+  | { type: "delta"; text: string }
+  | ({ type: "final" } & Record<string, unknown>)
+  | { type: "error"; error: string; retryable: boolean };
 
 /**
- * One conversational turn with Koda.
- * Onboarding mode gathers the profile; ongoing mode (once a profile exists)
- * captures relationship context, proposes profile updates, and answers
- * "what should I do next". The user's message is only persisted after the
- * provider produced a reply, so a failed turn never consumes the input.
+ * One conversational turn with Koda, streamed.
+ * The response is a text/event-stream of `delta` events (reply text as the
+ * provider produces it) followed by one `final` event carrying the same
+ * payload the JSON API used to return. Validation failures before the stream
+ * starts are plain JSON errors.
+ *
+ * Failure semantics are unchanged: the user's message is only persisted after
+ * the provider produced a complete reply, so a failed turn never consumes the
+ * input, and retrying with the same turnId can never double-persist.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -33,7 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { message?: unknown; inputMode?: unknown };
+  let body: { message?: unknown; inputMode?: unknown; turnId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -51,6 +60,10 @@ export async function POST(request: Request) {
     );
   }
   const inputMode = body.inputMode === "voice" ? "voice" : "text";
+  const turnId =
+    typeof body.turnId === "string" && body.turnId.length <= MAX_TURN_ID_LENGTH
+      ? body.turnId
+      : null;
 
   const { data: profileRow } = await supabase
     .from("profiles")
@@ -58,10 +71,34 @@ export async function POST(request: Request) {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (profileRow) {
-    return ongoingTurn(supabase, user.id, profileRow as Profile, message, inputMode, request);
-  }
-  return onboardingTurn(supabase, user.id, message, inputMode, request);
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emit = (event: StreamEvent) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+      };
+      try {
+        if (profileRow) {
+          await ongoingTurn(supabase, user.id, profileRow as Profile, message, inputMode, turnId, request, emit);
+        } else {
+          await onboardingTurn(supabase, user.id, message, inputMode, turnId, request, emit);
+        }
+      } catch (err) {
+        console.error("Talk turn failed unexpectedly:", err);
+        emit({ type: "error", error: "Koda could not process that. Your message is still here, try again.", retryable: true });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +110,9 @@ async function onboardingTurn(
   userId: string,
   message: string,
   inputMode: "text" | "voice",
-  request: Request
+  turnId: string | null,
+  request: Request,
+  emit: (event: StreamEvent) => void
 ) {
   // Load or create the active onboarding conversation. The partial unique
   // index makes concurrent creates race-safe: on conflict, re-fetch.
@@ -87,7 +126,8 @@ async function onboardingTurn(
     if (createError) {
       conversation = await getConversation(supabase, userId, "onboarding");
       if (!conversation) {
-        return NextResponse.json({ error: "Could not start conversation" }, { status: 500 });
+        emit({ type: "error", error: "Could not start conversation", retryable: true });
+        return;
       }
     } else {
       conversation = created as KodaConversation;
@@ -95,10 +135,11 @@ async function onboardingTurn(
     }
   }
 
-  const duplicate = await duplicateGuard(supabase, conversation.id, message);
+  const duplicate = await duplicateGuard(supabase, conversation.id, message, turnId);
   if (duplicate) {
     const extracted = conversation.extracted ?? {};
-    return NextResponse.json({
+    emit({
+      type: "final",
       conversationId: conversation.id,
       reply: duplicate.content,
       extracted,
@@ -107,6 +148,7 @@ async function onboardingTurn(
       aiMode: (duplicate.payload?.ai_mode as string) ?? "mock",
       duplicate: true,
     });
+    return;
   }
 
   const extracted: OnboardingExtracted = conversation.extracted ?? {};
@@ -121,14 +163,22 @@ async function onboardingTurn(
     }
     const ai = await getKodaAI();
     aiMode = ai.mode;
-    turn = await ai.onboardingTurn({ extracted, missing, history, userMessage: message });
+    turn = await ai.onboardingTurn({
+      extracted,
+      missing,
+      history,
+      userMessage: message,
+      onDelta: (text) => emit({ type: "delta", text }),
+    });
   } catch (err) {
     console.error("Talk turn failed:", err);
     logKodaEvent(supabase, userId, "ai_error", { mode: "onboarding" });
-    return NextResponse.json(
-      { error: "Koda could not process that. Your message is still here, try again.", retryable: true },
-      { status: 502 }
-    );
+    emit({
+      type: "error",
+      error: "Koda could not process that. Your message is still here, try again.",
+      retryable: true,
+    });
+    return;
   }
 
   const merged = mergeExtracted(extracted, turn.extracted);
@@ -142,14 +192,12 @@ async function onboardingTurn(
     role: "user",
     content: message,
     input_mode: inputMode,
-    payload: {},
+    payload: turnId ? { turn_id: turnId } : {},
   });
   if (userMsgError) {
     console.error("Failed to persist user message:", userMsgError);
-    return NextResponse.json(
-      { error: "Could not save your message. Try again.", retryable: true },
-      { status: 500 }
-    );
+    emit({ type: "error", error: "Could not save your message. Try again.", retryable: true });
+    return;
   }
 
   const { error: replyError } = await supabase.from("koda_messages").insert({
@@ -170,10 +218,8 @@ async function onboardingTurn(
   // turn succeeded: reported progress must never regress on reload.
   if (replyError || convUpdateError) {
     console.error("Failed to persist turn:", replyError ?? convUpdateError);
-    return NextResponse.json(
-      { error: "Could not save Koda's reply. Try again.", retryable: true },
-      { status: 500 }
-    );
+    emit({ type: "error", error: "Could not save Koda's reply. Try again.", retryable: true });
+    return;
   }
 
   logKodaEvent(supabase, userId, "onboarding_message_submitted", {
@@ -184,7 +230,8 @@ async function onboardingTurn(
     logKodaEvent(supabase, userId, "voice_input_used", { mode: "onboarding" });
   }
 
-  return NextResponse.json({
+  emit({
+    type: "final",
     conversationId: conversation.id,
     reply: turn.reply,
     extracted: merged,
@@ -204,7 +251,9 @@ async function ongoingTurn(
   profile: Profile,
   message: string,
   inputMode: "text" | "voice",
-  request: Request
+  turnId: string | null,
+  request: Request,
+  emit: (event: StreamEvent) => void
 ) {
   let conversation = await getConversation(supabase, userId, "ongoing");
   if (!conversation) {
@@ -214,14 +263,16 @@ async function ongoingTurn(
       .select()
       .single();
     if (createError || !created) {
-      return NextResponse.json({ error: "Could not start conversation" }, { status: 500 });
+      emit({ type: "error", error: "Could not start conversation", retryable: true });
+      return;
     }
     conversation = created as KodaConversation;
   }
 
-  const duplicate = await duplicateGuard(supabase, conversation.id, message);
+  const duplicate = await duplicateGuard(supabase, conversation.id, message, turnId);
   if (duplicate) {
-    return NextResponse.json({
+    emit({
+      type: "final",
       conversationId: conversation.id,
       reply: duplicate.content,
       intent: (duplicate.payload?.intent as string) ?? "chat",
@@ -231,6 +282,7 @@ async function ongoingTurn(
       aiMode: (duplicate.payload?.ai_mode as string) ?? "mock",
       duplicate: true,
     });
+    return;
   }
 
   // Grounding data: recent moves and confirmed relationship memory.
@@ -265,14 +317,17 @@ async function ongoingTurn(
         recentMoves: (moveRows ?? []) as OngoingGrounding["recentMoves"],
         relationships: (relationshipRows ?? []) as OngoingGrounding["relationships"],
       },
+      onDelta: (text) => emit({ type: "delta", text }),
     });
   } catch (err) {
     console.error("Ongoing turn failed:", err);
     logKodaEvent(supabase, userId, "ai_error", { mode: "ongoing" });
-    return NextResponse.json(
-      { error: "Koda could not process that. Your message is still here, try again.", retryable: true },
-      { status: 502 }
-    );
+    emit({
+      type: "error",
+      error: "Koda could not process that. Your message is still here, try again.",
+      retryable: true,
+    });
+    return;
   }
 
   // Fill old values for profile diffs server-side: the model never asserts
@@ -292,16 +347,14 @@ async function ongoingTurn(
       role: "user",
       content: message,
       input_mode: inputMode,
-      payload: {},
+      payload: turnId ? { turn_id: turnId } : {},
     })
     .select()
     .single();
   if (userMsgError || !userMsg) {
     console.error("Failed to persist user message:", userMsgError);
-    return NextResponse.json(
-      { error: "Could not save your message. Try again.", retryable: true },
-      { status: 500 }
-    );
+    emit({ type: "error", error: "Could not save your message. Try again.", retryable: true });
+    return;
   }
 
   const { data: kodaMsg, error: replyError } = await supabase
@@ -335,10 +388,8 @@ async function ongoingTurn(
 
   if (replyError || !kodaMsg || convUpdateError) {
     console.error("Failed to persist turn:", replyError ?? convUpdateError);
-    return NextResponse.json(
-      { error: "Could not save Koda's reply. Try again.", retryable: true },
-      { status: 500 }
-    );
+    emit({ type: "error", error: "Could not save Koda's reply. Try again.", retryable: true });
+    return;
   }
 
   if (inputMode === "voice") {
@@ -353,7 +404,8 @@ async function ongoingTurn(
     });
   }
 
-  return NextResponse.json({
+  emit({
+    type: "final",
     conversationId: conversation.id,
     reply: turn.reply,
     intent: turn.intent,
@@ -384,11 +436,18 @@ async function getConversation(
   return (data as KodaConversation) ?? null;
 }
 
-/** Identical message inside the window returns the previous reply. */
+/**
+ * Idempotency: a retried turn returns the previous reply instead of running
+ * again. Matched by client turnId when provided (robust), falling back to the
+ * identical-message-within-window heuristic. The reply must be newer than the
+ * user message, otherwise the previous turn failed mid-persist and this is a
+ * legitimate retry that must run.
+ */
 async function duplicateGuard(
   supabase: ServerSupabase,
   conversationId: string,
-  message: string
+  message: string,
+  turnId: string | null
 ): Promise<KodaMessage | null> {
   const { data: recent } = await supabase
     .from("koda_messages")
@@ -399,15 +458,17 @@ async function duplicateGuard(
   const recentMessages = (recent ?? []) as KodaMessage[];
   const lastUser = recentMessages.find((m) => m.role === "user");
   const lastKoda = recentMessages.find((m) => m.role === "koda");
+  if (!lastUser || !lastKoda) return null;
+  const replyCompletesTurn =
+    new Date(lastKoda.created_at).getTime() >= new Date(lastUser.created_at).getTime();
+  if (!replyCompletesTurn) return null;
+
+  if (turnId && lastUser.payload?.turn_id === turnId) {
+    return lastKoda;
+  }
   if (
-    lastUser &&
-    lastKoda &&
     lastUser.content === message &&
-    Date.now() - new Date(lastUser.created_at).getTime() < DUPLICATE_WINDOW_MS &&
-    // The reply must belong to that user message. If the reply is older, the
-    // previous turn failed mid-persist and this is a legitimate retry, not a
-    // duplicate: it must run, or the retried extraction would be dropped.
-    new Date(lastKoda.created_at).getTime() >= new Date(lastUser.created_at).getTime()
+    Date.now() - new Date(lastUser.created_at).getTime() < DUPLICATE_WINDOW_MS
   ) {
     return lastKoda;
   }

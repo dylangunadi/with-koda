@@ -9,7 +9,12 @@ import { InboxTabs } from "@/components/InboxTabs";
 import { BriefHeader } from "@/components/BriefHeader";
 import { MessageCircle } from "lucide-react";
 
-export default async function InboxPage() {
+export default async function InboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
+  const { from } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -71,6 +76,12 @@ export default async function InboxPage() {
           <GenerateMovesButton />
         </div>
       </div>
+
+      {from === "talk" && brief && (
+        <p className="font-system text-primary">
+          Built from your conversation just now. Three moves, ready to act on.
+        </p>
+      )}
 
       {brief && briefMoveCount > 0 && (
         <BriefHeader brief={brief} moveCount={briefMoveCount} />
