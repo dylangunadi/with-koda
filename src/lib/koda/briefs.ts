@@ -40,6 +40,7 @@ export async function insertBriefWithMoves(
     confidence: move.confidence,
     priority: move.priority,
     effort: move.effort,
+    effort_bucket: move.effort_bucket,
     expected_outcome: move.expected_outcome,
     source_status: move.source_status,
     status: "generated" as const,

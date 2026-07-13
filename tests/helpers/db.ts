@@ -100,6 +100,7 @@ export async function seedOnboardedUser(prefix: string) {
         status: "generated",
         priority: "now",
         effort: "30 min",
+        effort_bucket: "focused",
         expected_outcome: "Seeded outcome",
         source_status: "user_provided",
       }))

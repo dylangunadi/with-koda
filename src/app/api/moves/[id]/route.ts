@@ -45,10 +45,23 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { status, outreach_draft } = body as {
+  const { status, outreach_draft, actual_effort_bucket, feedback } = body as {
     status?: string;
     outreach_draft?: string;
+    actual_effort_bucket?: string;
+    feedback?: string;
   };
+
+  const VALID_BUCKETS = ["quick", "focused", "project"];
+  if (actual_effort_bucket !== undefined && !VALID_BUCKETS.includes(actual_effort_bucket)) {
+    return NextResponse.json(
+      { error: `Invalid effort bucket. Must be one of: ${VALID_BUCKETS.join(", ")}` },
+      { status: 400 }
+    );
+  }
+  if (feedback !== undefined && (typeof feedback !== "string" || feedback.length > 500)) {
+    return NextResponse.json({ error: "Invalid feedback" }, { status: 400 });
+  }
 
   // Validate outreach_draft length
   if (outreach_draft !== undefined && outreach_draft.length > MAX_DRAFT_LENGTH) {
@@ -91,6 +104,11 @@ export async function PATCH(
     updates.outreach_draft = outreach_draft;
   }
 
+  // Actual effort arrives with completion and calibrates future estimates.
+  if (actual_effort_bucket !== undefined) {
+    updates.actual_effort_bucket = actual_effort_bucket;
+  }
+
   const { data: updated, error: updateError } = await supabase
     .from("recruiting_moves")
     .update(updates)
@@ -113,12 +131,16 @@ export async function PATCH(
     eventType = "edited";
   }
 
-  // Insert move_event
+  // Insert move_event. Optional rejection feedback (why a move was not
+  // relevant) rides in metadata and feeds future generations.
   const { error: eventError } = await supabase.from("move_events").insert({
     move_id: id,
     user_id: user.id,
     event_type: eventType,
-    metadata: {},
+    metadata: {
+      ...(feedback?.trim() ? { feedback: feedback.trim() } : {}),
+      ...(actual_effort_bucket ? { actual_effort_bucket } : {}),
+    },
   });
 
   if (eventError) {

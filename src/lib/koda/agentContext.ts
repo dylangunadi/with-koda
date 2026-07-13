@@ -90,6 +90,29 @@ function extractFeedbackPatterns(
     toneSignals.push("User accepts more moves than they send — they may be selective about outreach timing.");
   }
 
+  // Effort calibration: compare predicted buckets against what users report
+  // at completion, and steer future sizing accordingly.
+  const BUCKET_ORDER = ["quick", "focused", "project"];
+  const calibrated = moves.filter((m) => m.effort_bucket && m.actual_effort_bucket);
+  if (calibrated.length >= 2) {
+    const drift = calibrated.reduce(
+      (sum, m) =>
+        sum +
+        (BUCKET_ORDER.indexOf(m.actual_effort_bucket as string) -
+          BUCKET_ORDER.indexOf(m.effort_bucket as string)),
+      0
+    );
+    if (drift >= 2) {
+      toneSignals.push(
+        "Effort estimates run LOW for this student: moves regularly take a bucket longer than predicted. Size effort_bucket conservatively (round up)."
+      );
+    } else if (drift <= -2) {
+      toneSignals.push(
+        "Effort estimates run HIGH for this student: moves finish faster than predicted. Size effort_bucket down when in doubt."
+      );
+    }
+  }
+
   return {
     boost_types: boostTypes,
     boost_companies: boostCompanies,

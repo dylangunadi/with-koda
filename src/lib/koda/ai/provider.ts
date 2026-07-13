@@ -1,4 +1,4 @@
-import type { AgentContext, MoveSourceStatus, MoveType, OnboardingExtracted, Profile } from "@/lib/types";
+import type { AgentContext, EffortBucket, MoveSourceStatus, MoveType, OnboardingExtracted, Profile } from "@/lib/types";
 import { getAnthropicApiKey } from "@/lib/env";
 
 export interface GeneratedMove {
@@ -15,6 +15,7 @@ export interface GeneratedMove {
   confidence: number;
   priority: string;
   effort: string;
+  effort_bucket: EffortBucket;
   expected_outcome: string;
   source_status: MoveSourceStatus;
 }

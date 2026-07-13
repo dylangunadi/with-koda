@@ -67,11 +67,18 @@ export interface RecruitingMove {
   brief_id: string | null;
   priority: string | null;
   effort: string | null;
+  effort_bucket: EffortBucket | null;
+  actual_effort_bucket: EffortBucket | null;
   expected_outcome: string | null;
   source_status: MoveSourceStatus;
   created_at: string;
   updated_at: string;
 }
+
+/** Broad effort sizing: quick (under 15 min), focused (15-45 min),
+ * project (multiple sessions). Predictions are calibrated against the
+ * actual bucket users report at completion. */
+export type EffortBucket = "quick" | "focused" | "project";
 
 // --- Talk to Koda types ---
 

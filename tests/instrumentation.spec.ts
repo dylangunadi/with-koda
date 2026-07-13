@@ -44,12 +44,10 @@ test("activation flow records product events without leaking user content", asyn
   await expect(page).toHaveURL(/\/inbox/, { timeout: 20000 });
 
   // Take one action on a move: the activation definition's third leg.
-  await page
-    .locator(".move-card")
-    .first()
-    .getByRole("button", { name: "Accept move" })
-    .click();
-  await expect(page.getByText("Accepted", { exact: true }).first()).toBeVisible();
+  const firstCard = page.locator(".move-card").first();
+  await firstCard.getByRole("button", { name: "Mark completed" }).click();
+  await firstCard.getByRole("button", { name: /Quick/ }).click();
+  await expect(page.getByRole("tab", { name: /Completed/ })).toContainText("1");
 
   const db = adminClient();
   const { data: users } = await db.auth.admin.listUsers({ perPage: 200 });
@@ -71,7 +69,7 @@ test("activation flow records product events without leaking user content", asyn
     "profile_review_edited",
     "first_brief_generation_started",
     "first_brief_generated",
-    "move_accepted",
+    "move_completed",
   ]) {
     expect(names, `expected event ${expected}`).toContain(expected);
   }

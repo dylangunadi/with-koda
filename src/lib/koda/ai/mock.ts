@@ -325,7 +325,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       title: `Reconnect with a contact you already have`,
       type: "person_to_contact",
       company: null,
-      person: `From your own notes: "${contacts.slice(0, 120)}"`,
+      person: "Someone you already know (from your onboarding notes)",
       fit_reason: `You told Koda you already know people who can help: "${contacts.slice(0, 160)}". A warm contact is worth more than ten cold applications, especially while you are ${stage}.`,
       suggested_action: "Send a short reconnect message to the most relevant person from your notes today.",
       outreach_draft: `Hi! It has been a while since we talked. I am focusing my search on ${role} work right now${secondCompany ? ` at places like ${company} and ${secondCompany}` : company !== "one of your target companies" ? ` at places like ${company}` : ""}, and I would really value 15 minutes to hear how things look from where you sit. Any chance you have time this week or next?`,
@@ -335,6 +335,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       confidence: 0.75,
       priority: "now",
       effort: "20-30 min",
+      effort_bucket: "focused",
       expected_outcome: "One warm conversation scheduled with someone you already know.",
       source_status: "user_provided",
     });
@@ -353,6 +354,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       confidence: 0.65,
       priority: "this_week",
       effort: "30-45 min",
+      effort_bucket: "focused",
       expected_outcome: "One real conversation started at a stated target company.",
       source_status: "ai_suggested",
     });
@@ -379,6 +381,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
     confidence: 0.7,
     priority: "this_week",
     effort: "1-2 hours",
+    effort_bucket: "project",
     expected_outcome: "A linkable artifact that upgrades every application and message you send.",
     source_status: proof ? "inferred" : "ai_suggested",
   });
@@ -398,6 +401,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
     confidence: 0.6,
     priority: "soon",
     effort: "30 min",
+    effort_bucket: "focused",
     expected_outcome: "A two-week plan matched to your stated deadline, so effort lands where you said it matters.",
     source_status: "inferred",
   });

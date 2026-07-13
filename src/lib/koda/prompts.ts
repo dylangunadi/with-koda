@@ -128,6 +128,7 @@ Each object must have these exact keys:
 - confidence: number between 0 and 1
 - priority: one of "now" | "this_week" | "soon"
 - effort: realistic time estimate like "30 min" or "1-2 hours"
+- effort_bucket: one of "quick" (under 15 minutes) | "focused" (15-45 minutes) | "project" (multiple sessions); size honestly, students punish underestimates
 - expected_outcome: string (what completing this move actually gets the student)
 - source_status: one of "user_provided" (built directly from facts the student stated), "inferred" (a reasonable conclusion from their profile), "ai_suggested" (your idea, not grounded in a specific stated fact)
 
@@ -270,7 +271,11 @@ export function buildUserPrompt(
     if (recentBad.length > 0) {
       parts.push("\nRecent moves the student rejected (avoid similar moves):");
       for (const m of recentBad) {
-        parts.push(`- [${m.type}] ${m.title}${m.company ? ` (${m.company})` : ""}`);
+        const rejection = agentContext.move_events.find(
+          (e) => e.move_id === m.id && e.event_type === "rejected" && e.metadata?.feedback
+        );
+        const why = rejection ? ` — student said: "${String(rejection.metadata.feedback).slice(0, 120)}"` : "";
+        parts.push(`- [${m.type}] ${m.title}${m.company ? ` (${m.company})` : ""}${why}`);
       }
     }
 

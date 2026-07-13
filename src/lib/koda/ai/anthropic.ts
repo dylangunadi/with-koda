@@ -8,7 +8,7 @@ import {
   buildOngoingTurnPrompt,
   buildUserPrompt,
 } from "@/lib/koda/prompts";
-import type { AgentContext, MoveSourceStatus, MoveType, OnboardingExtracted, Profile } from "@/lib/types";
+import type { AgentContext, EffortBucket, MoveSourceStatus, MoveType, OnboardingExtracted, Profile } from "@/lib/types";
 import type {
   GeneratedMove,
   KodaAI,
@@ -153,6 +153,11 @@ function sanitizeMove(move: Record<string, unknown>): GeneratedMove {
       ? String(move.priority)
       : "this_week",
     effort: String(move.effort || "about an hour"),
+    effort_bucket: (["quick", "focused", "project"] as EffortBucket[]).includes(
+      move.effort_bucket as EffortBucket
+    )
+      ? (move.effort_bucket as EffortBucket)
+      : "focused",
     expected_outcome: String(move.expected_outcome || ""),
     source_status: VALID_SOURCE_STATUSES.includes(move.source_status as MoveSourceStatus)
       ? (move.source_status as MoveSourceStatus)
