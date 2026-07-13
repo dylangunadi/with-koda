@@ -24,7 +24,7 @@ test("@critical returning onboarded user bypasses onboarding and sees the saved 
   await page.goto("/talk");
   await expect(page.getByText("What happened since we last talked?")).toBeVisible();
   await expect(page.getByLabel("Message Koda")).toBeVisible();
-  await expect(page.getByText(/of 9 covered/)).toHaveCount(0);
+  await expect(page.locator("[data-onboarding-remaining]")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Back to inbox" })).toBeVisible();
   await page.getByRole("link", { name: "Back to inbox" }).click();
   await expect(page).toHaveURL(/\/inbox/);

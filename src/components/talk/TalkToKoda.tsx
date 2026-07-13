@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { KodaLogo } from "@/components/KodaLogo";
 import { ReviewConfirm } from "@/components/talk/ReviewConfirm";
 import { ConfirmationCard } from "@/components/talk/ConfirmationCard";
 import type { OngoingProposal } from "@/lib/koda/ai/provider";
@@ -52,7 +53,6 @@ export function TalkToKoda({
   initialExtracted,
   initialMissing,
   firstQuestion,
-  totalFields,
   initialAiMode,
 }: TalkToKodaProps) {
   const router = useRouter();
@@ -232,7 +232,6 @@ export function TalkToKoda({
     send(input.trim() || attempt.text, attempt.turnId);
   };
 
-  const answered = totalFields - missing.length;
 
   return (
     <div className="h-dvh bg-background relative overflow-hidden flex flex-col">
@@ -247,7 +246,7 @@ export function TalkToKoda({
       <header className="relative z-10 shrink-0 border-b border-border/40 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
-            <div className="status-dot" />
+            <KodaLogo size={26} />
             <span className="font-heading text-xl font-bold tracking-tight text-foreground">Koda</span>
           </div>
           <div className="flex items-center gap-3">
@@ -257,9 +256,12 @@ export function TalkToKoda({
               </span>
             )}
             {onboarding ? (
-              <span className="font-system text-primary">
-                {done ? "Review" : `${answered} of ${totalFields} covered`}
-              </span>
+              <span
+                aria-hidden="true"
+                className="hidden"
+                data-onboarding-remaining={missing.length}
+                data-onboarding-done={done ? "1" : "0"}
+              />
             ) : (
               <Link
                 href="/inbox"
@@ -284,7 +286,10 @@ export function TalkToKoda({
             m.role === "koda" ? (
               <div key={m.id ?? i} className="max-w-[85%] space-y-3">
                 <div>
-                  <p className="font-system text-primary mb-1.5">Koda</p>
+                  <p className="mb-1.5 flex items-center gap-1.5 font-system text-primary">
+                    <KodaLogo size={18} className="shrink-0" aria-hidden />
+                    Koda
+                  </p>
                   <p className="text-[15px] leading-relaxed text-foreground whitespace-pre-wrap">
                     {m.content}
                     {m.streaming && <span className="inline-block w-2 h-4 ml-0.5 align-text-bottom bg-primary/40 animate-pulse" aria-hidden />}
@@ -306,11 +311,24 @@ export function TalkToKoda({
               </div>
             )
           )}
-          {done && onboarding && (
-            <ReviewConfirm extracted={extracted} onDone={() => router.push("/inbox?from=talk")} />
-          )}
+
         </div>
       </div>
+
+      {/* The end-of-conversation review pops up over the chat so it can
+          never be missed at the bottom of a long transcript. */}
+      {done && onboarding && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Review what Koda learned"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 backdrop-blur-sm sm:items-center sm:p-6"
+        >
+          <div className="page-enter w-full max-h-[92dvh] overflow-y-auto rounded-t-2xl sm:max-w-xl sm:rounded-2xl">
+            <ReviewConfirm extracted={extracted} onDone={() => router.push("/inbox?from=talk")} />
+          </div>
+        </div>
+      )}
 
       {/* Composer: pinned to the bottom, available in every state. */}
       {!done && (

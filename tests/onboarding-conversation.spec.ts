@@ -19,9 +19,10 @@ async function answer(page: import("@playwright/test").Page, text: string, expec
   await page.getByRole("button", { name: "Send" }).click();
   await expect(
     page
-      .getByText(`${expectedCovered} of 9 covered`)
+      .locator(`[data-onboarding-remaining="${9 - expectedCovered}"]`)
       .or(page.getByRole("heading", { name: "Here is what Koda learned" }))
-  ).toBeVisible({ timeout: 15000 });
+      .first()
+  ).toBeAttached({ timeout: 15000 });
 }
 
 test("@critical new user enters Talk to Koda, completes onboarding, gets a persisted first brief", async ({
@@ -32,7 +33,7 @@ test("@critical new user enters Talk to Koda, completes onboarding, gets a persi
   // 1. Signup routes into Talk to Koda, never an empty dashboard.
   await signupViaUi(page, email);
   await expect(page.getByText("I am Koda")).toBeVisible();
-  await expect(page.getByText("0 of 9 covered")).toBeVisible();
+  await expect(page.locator('[data-onboarding-remaining="9"]')).toBeAttached();
 
   // 2. Answer the first half of the conversation.
   for (let i = 0; i < 4; i++) {
@@ -42,7 +43,7 @@ test("@critical new user enters Talk to Koda, completes onboarding, gets a persi
   // 3. Refresh mid-conversation: state must resume, nothing lost.
   await page.reload();
   await expect(page.getByText("Resumed. Nothing you said was lost.")).toBeVisible();
-  await expect(page.getByText("4 of 9 covered")).toBeVisible();
+  await expect(page.locator('[data-onboarding-remaining="5"]')).toBeAttached();
   await expect(page.getByText(ANSWERS[3])).toBeVisible(); // transcript preserved
 
   // Structured persistence (not just a transcript): extracted jsonb has fields.
@@ -133,5 +134,5 @@ test("@critical new user enters Talk to Koda, completes onboarding, gets a persi
   // conversation.
   await page.goto("/talk");
   await expect(page.getByText("What happened since we last talked?")).toBeVisible();
-  await expect(page.getByText(/of 9 covered/)).toHaveCount(0);
+  await expect(page.locator("[data-onboarding-remaining]")).toHaveCount(0);
 });

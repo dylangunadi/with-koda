@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { KodaLogo } from "@/components/KodaLogo";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { WaitlistForm } from "@/components/WaitlistForm";
@@ -24,7 +25,7 @@ export default async function Home({
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="status-dot" />
+            <KodaLogo size={26} />
             <span className="font-heading text-lg font-semibold tracking-tight text-foreground">
               Koda
             </span>

@@ -29,16 +29,16 @@ test("AI failure preserves the user's input and permits retry", async ({ page, c
   const banner = page.getByRole("alert").filter({ hasText: /./ });
   await expect(banner).toContainText(/could not process|try again/i);
   await expect(page.getByLabel("Message Koda")).toHaveValue(message);
-  await expect(page.getByText("0 of 9 covered")).toBeVisible();
+  await expect(page.locator('[data-onboarding-remaining="9"]')).toBeAttached();
 
   // Recover and retry: the same input goes through.
   await context.setExtraHTTPHeaders({});
   await banner.getByRole("button", { name: "Retry" }).click();
-  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('[data-onboarding-remaining="8"]')).toBeAttached({ timeout: 20000 });
 
   // A failed turn is also never persisted: reload shows the same progress.
   await page.reload();
-  await expect(page.getByText("1 of 9 covered")).toBeVisible();
+  await expect(page.locator('[data-onboarding-remaining="8"]')).toBeAttached();
 });
 
 test("duplicate rapid submission does not create a second turn", async ({ page }) => {
@@ -47,7 +47,7 @@ test("duplicate rapid submission does not create a second turn", async ({ page }
 
   await page.getByLabel("Message Koda").fill("I'm Alex at Stanford");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('[data-onboarding-remaining="8"]')).toBeAttached({ timeout: 20000 });
 
   const db = adminClient();
   const { data: users } = await db.auth.admin.listUsers({ perPage: 200 });
@@ -84,9 +84,10 @@ test("repeated confirm produces exactly one profile, one brief, three moves", as
     await page.getByRole("button", { name: "Send" }).click();
     await expect(
       page
-        .getByText(`${i + 1} of 9 covered`)
+        .locator(`[data-onboarding-remaining="${9 - (i + 1)}"]`)
         .or(page.getByRole("heading", { name: "Here is what Koda learned" }))
-    ).toBeVisible({ timeout: 20000 });
+        .first()
+    ).toBeAttached({ timeout: 20000 });
   }
 
   const confirm = page.getByRole("button", { name: "Confirm and build my first brief" });

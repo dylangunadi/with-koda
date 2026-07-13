@@ -37,10 +37,11 @@
 
 ### Talk to Koda Chat Surface
 - Fixed viewport (`h-dvh`, `src/components/talk/TalkToKoda.tsx`): the transcript is the only scrolling region and auto-follows new messages; the header and composer are anchored, with `env(safe-area-inset-bottom)` padding on mobile — the page itself never grows or scrolls
-- Koda messages are plain text under a mono "Koda" label with a pulsing caret while streaming; user messages are right-aligned accent bubbles
-- Header carries the mono progress label ("N of 9 covered" → "Review") during onboarding, or a "Back to inbox" link in ongoing mode
+- Koda messages carry the Koda logo mark (`src/components/KodaLogo.tsx`: teal circle, monoline K with a dot for its upper arm) beside a mono "Koda" label, with a pulsing caret while streaming; user messages are right-aligned accent bubbles
+- The header shows the logo + wordmark; there is no visible progress counter during onboarding (a hidden `data-onboarding-remaining` attribute keeps tests deterministic) — the conversation should feel natural, not like a form
 - Completed Koda replies are announced once through a visually hidden `aria-live="polite"` region; the transcript itself is not a live region (streaming deltas would be re-announced word by word)
 - The composer is pinned at the bottom in every state; the "Offline sample mode" chip (mono, muted) appears whenever the deterministic provider is active — never hide it
+- The end-of-onboarding review pops up as a modal over the dimmed chat (never buried at the bottom of the transcript)
 - Confirmation cards (relationship memory, profile diffs) are standard cards with a mono question label ("Save to memory?" / "Update your profile?"), Confirm + "Not now" buttons, and old values struck through in diffs
 - Voice calls (orb, mic, TTS) live on the `feat/voice-call-onboarding` branch, not here
 

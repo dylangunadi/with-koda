@@ -33,9 +33,10 @@ test("activation flow records product events without leaking user content", asyn
     await page.getByRole("button", { name: "Send" }).click();
     await expect(
       page
-        .getByText(`${i + 1} of 9 covered`)
+        .locator(`[data-onboarding-remaining="${9 - (i + 1)}"]`)
         .or(page.getByRole("heading", { name: "Here is what Koda learned" }))
-    ).toBeVisible({ timeout: 15000 });
+        .first()
+    ).toBeAttached({ timeout: 15000 });
   }
 
   // Edit a review field (fires profile_review_edited), keep Manual, confirm.
