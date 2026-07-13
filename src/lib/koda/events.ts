@@ -15,6 +15,7 @@ export type KodaEventName =
   | "onboarding_started"
   | "onboarding_message_submitted"
   | "onboarding_resumed"
+  | "onboarding_extraction_empty"
   | "onboarding_completed"
   | "profile_review_edited"
   | "brief_preference_set"

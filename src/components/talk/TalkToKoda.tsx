@@ -233,6 +233,8 @@ export function TalkToKoda({
   };
 
 
+  const userTurns = messages.filter((m) => m.role === "user").length;
+
   return (
     <div className="h-dvh bg-background relative overflow-hidden flex flex-col">
       <div className="grain fixed inset-0 pointer-events-none" />
@@ -325,6 +327,15 @@ export function TalkToKoda({
           className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 backdrop-blur-sm sm:items-center sm:p-6"
         >
           <div className="page-enter w-full max-h-[92dvh] overflow-y-auto rounded-t-2xl sm:max-w-xl sm:rounded-2xl">
+            <div className="flex justify-end bg-card px-6 pt-4 rounded-t-2xl sm:rounded-t-2xl">
+              <button
+                type="button"
+                onClick={() => setDone(false)}
+                className="font-system text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Keep chatting
+              </button>
+            </div>
             <ReviewConfirm extracted={extracted} onDone={() => router.push("/inbox?from=talk")} />
           </div>
         </div>
@@ -334,6 +345,17 @@ export function TalkToKoda({
       {!done && (
         <div className="relative z-10 shrink-0 border-t border-border/40 bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto max-w-2xl px-6 py-3 space-y-3">
+            {onboarding && userTurns >= 4 && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDone(true)}
+                  className="font-system text-primary underline underline-offset-2 hover:text-foreground transition-colors"
+                >
+                  Wrap up and review what Koda has
+                </button>
+              </div>
+            )}
             {error && (
               <div
                 role="alert"

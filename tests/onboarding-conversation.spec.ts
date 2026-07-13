@@ -136,3 +136,32 @@ test("@critical new user enters Talk to Koda, completes onboarding, gets a persi
   await expect(page.getByText("What happened since we last talked?")).toBeVisible();
   await expect(page.locator("[data-onboarding-remaining]")).toHaveCount(0);
 });
+
+test("wrap up early: the review is reachable even if extraction stalls", async ({ page }) => {
+  await signupViaUi(page, uniqueEmail("wrapup"));
+
+  // Four answers in, the wrap-up affordance appears regardless of progress.
+  const partial = ANSWERS.slice(0, 4);
+  for (let i = 0; i < partial.length; i++) {
+    await page.getByLabel("Message Koda").fill(partial[i]);
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(page.locator(`[data-onboarding-remaining="${9 - (i + 1)}"]`)).toBeAttached({
+      timeout: 20000,
+    });
+  }
+
+  await page.getByRole("button", { name: "Wrap up and review what Koda has" }).click();
+  await expect(page.getByRole("heading", { name: "Here is what Koda learned" })).toBeVisible();
+
+  // Reversible: Keep chatting returns to the conversation.
+  await page.getByRole("button", { name: "Keep chatting" }).click();
+  await expect(page.getByRole("heading", { name: "Here is what Koda learned" })).toHaveCount(0);
+  await expect(page.getByLabel("Message Koda")).toBeVisible();
+
+  // Wrap up again and confirm with partial data: review fields are editable,
+  // only the name is required, and the brief still gets built.
+  await page.getByRole("button", { name: "Wrap up and review what Koda has" }).click();
+  await page.getByRole("button", { name: "Confirm and build my first brief" }).click();
+  await expect(page).toHaveURL(/\/inbox/, { timeout: 20000 });
+  await expect(page.getByText("Koda Brief", { exact: true })).toBeVisible();
+});

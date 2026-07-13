@@ -237,6 +237,15 @@ async function onboardingTurn(
     return;
   }
 
+  // A turn that extracted nothing is invisible to the user but is exactly
+  // how onboarding stalls (the checklist never empties). Count them so a
+  // stuck live-model conversation is diagnosable from koda_events alone.
+  if (Object.keys(turn.extracted).length === 0) {
+    logKodaEvent(supabase, userId, "onboarding_extraction_empty", {
+      fields_missing: remaining.length,
+    });
+  }
+
   logKodaEvent(supabase, userId, "onboarding_message_submitted", {
     input_mode: inputMode,
     fields_remaining: remaining.length,
