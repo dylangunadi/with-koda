@@ -246,9 +246,9 @@ export function buildUserPrompt(
       parts.push(`Tone note: ${signal}`);
     }
 
-    // Show recent accepted/sent moves to avoid duplicates
+    // Show recent moves the student acted on, to build on rather than repeat
     const recentGood = agentContext.prior_moves
-      .filter((m) => m.status === "accepted" || m.status === "sent")
+      .filter((m) => m.status === "accepted" || m.status === "sent" || m.status === "completed")
       .slice(0, 5);
     if (recentGood.length > 0) {
       parts.push("\nRecent moves the student liked (do NOT repeat these, build on them):");

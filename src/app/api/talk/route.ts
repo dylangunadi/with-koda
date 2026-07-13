@@ -403,7 +403,11 @@ async function duplicateGuard(
     lastUser &&
     lastKoda &&
     lastUser.content === message &&
-    Date.now() - new Date(lastUser.created_at).getTime() < DUPLICATE_WINDOW_MS
+    Date.now() - new Date(lastUser.created_at).getTime() < DUPLICATE_WINDOW_MS &&
+    // The reply must belong to that user message. If the reply is older, the
+    // previous turn failed mid-persist and this is a legitimate retry, not a
+    // duplicate: it must run, or the retried extraction would be dropped.
+    new Date(lastKoda.created_at).getTime() >= new Date(lastUser.created_at).getTime()
   ) {
     return lastKoda;
   }
@@ -411,11 +415,13 @@ async function duplicateGuard(
 }
 
 async function loadHistory(supabase: ServerSupabase, conversationId: string) {
+  // Most recent turns, oldest-first for the prompt. (Fetching ascending with a
+  // limit would freeze the window at the start of a long conversation.)
   const { data: historyRows } = await supabase
     .from("koda_messages")
     .select("role,content")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
-    .limit(30);
-  return ((historyRows ?? []) as { role: "user" | "koda"; content: string }[]).slice(-12);
+    .order("created_at", { ascending: false })
+    .limit(12);
+  return ((historyRows ?? []) as { role: "user" | "koda"; content: string }[]).reverse();
 }

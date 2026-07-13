@@ -9,7 +9,11 @@ import type { KodaMessage } from "@/lib/types";
  * Resolve a pending conversation proposal.
  * Nothing is written to relationships or the profile until the user confirms
  * here; declining records the resolution and writes nothing else.
- * Resolution is idempotent: a proposal can only move out of 'pending' once.
+ *
+ * Idempotency: the resolution status is claimed BEFORE effects are applied
+ * (and reverted if they fail), and relationship inserts are additionally
+ * deduplicated by their source message, so a retry after a partial failure
+ * cannot double-insert.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -53,8 +57,33 @@ export async function POST(request: Request) {
     });
   }
 
+  const sourceMessageId = (message.payload.source_user_message_id as string) ?? null;
+
+  // Dedupe: if relationships from this exact proposal already exist, a prior
+  // apply succeeded even if its status write was lost.
+  if (accept && proposal.relationships?.length && sourceMessageId) {
+    const { data: existing } = await supabase
+      .from("relationships")
+      .select("id")
+      .eq("source_message_id", sourceMessageId)
+      .limit(1);
+    if (existing?.length) {
+      await setProposalStatus(supabase, messageId, message, "applied");
+      return NextResponse.json({ applied: true, alreadyResolved: true });
+    }
+  }
+
+  // Claim the resolution before applying effects.
+  const targetStatus = accept ? ("applied" as const) : ("declined" as const);
+  const claimError = await setProposalStatus(supabase, messageId, message, targetStatus);
+  if (claimError) {
+    return NextResponse.json(
+      { error: "Could not save that. Try again.", retryable: true },
+      { status: 500 }
+    );
+  }
+
   if (!accept) {
-    await resolveProposal(supabase, messageId, message, "declined");
     if (proposal.relationships) {
       logKodaEvent(supabase, user.id, "context_declined");
     }
@@ -64,7 +93,6 @@ export async function POST(request: Request) {
   // Apply relationship memory: original user words preserved verbatim.
   if (proposal.relationships?.length) {
     const sourceMessage = (message.payload.source_user_message as string) ?? null;
-    const sourceMessageId = (message.payload.source_user_message_id as string) ?? null;
     const rows = proposal.relationships.map((r) => ({
       user_id: user.id,
       person_name: r.person_name,
@@ -79,6 +107,7 @@ export async function POST(request: Request) {
     const { error: insertError } = await supabase.from("relationships").insert(rows);
     if (insertError) {
       console.error("Failed to save relationships:", insertError);
+      await setProposalStatus(supabase, messageId, message, "pending");
       return NextResponse.json(
         { error: "Could not save that. Try again.", retryable: true },
         { status: 500 }
@@ -90,7 +119,8 @@ export async function POST(request: Request) {
     });
   }
 
-  // Apply profile updates: whitelisted fields only.
+  // Apply profile updates: whitelisted fields only. Re-applying the same
+  // values is naturally idempotent.
   if (proposal.profile_diff?.length) {
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     const applied: string[] = [];
@@ -106,6 +136,7 @@ export async function POST(request: Request) {
         .eq("user_id", user.id);
       if (updateError) {
         console.error("Failed to update profile:", updateError);
+        await setProposalStatus(supabase, messageId, message, "pending");
         return NextResponse.json(
           { error: "Could not update your profile. Try again.", retryable: true },
           { status: 500 }
@@ -118,19 +149,22 @@ export async function POST(request: Request) {
     }
   }
 
-  await resolveProposal(supabase, messageId, message, "applied");
   return NextResponse.json({ applied: true });
 }
 
-async function resolveProposal(
+async function setProposalStatus(
   supabase: Awaited<ReturnType<typeof createClient>>,
   messageId: string,
   message: KodaMessage,
-  status: "applied" | "declined"
-) {
+  status: "pending" | "applied" | "declined"
+): Promise<Error | null> {
   const { error } = await supabase
     .from("koda_messages")
     .update({ payload: { ...message.payload, proposal_status: status } })
     .eq("id", messageId);
-  if (error) console.error("Failed to resolve proposal:", error);
+  if (error) {
+    console.error("Failed to set proposal status:", error);
+    return new Error(error.message);
+  }
+  return null;
 }

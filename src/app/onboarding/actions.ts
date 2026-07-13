@@ -15,9 +15,6 @@ interface ProfileFormData {
   linkedin_url: string
   focus_options: string[]
   semester_goal: string
-  autonomous_enabled?: boolean
-  brief_frequency?: string
-  brief_email?: string
 }
 
 function splitCommas(value: string): string[] {
@@ -39,6 +36,9 @@ export async function saveProfile(data: ProfileFormData) {
     throw new Error("Not authenticated")
   }
 
+  // Brief settings (autonomous_enabled, brief_frequency, brief_email) are
+  // deliberately NOT written here: they are managed by /api/briefs so profile
+  // edits can never silently change scheduled-brief consent or email state.
   const profile = {
     user_id: user.id,
     name: data.name || null,
@@ -53,9 +53,6 @@ export async function saveProfile(data: ProfileFormData) {
     linkedin_url: data.linkedin_url || null,
     focus_options: data.focus_options,
     semester_goal: data.semester_goal || null,
-    autonomous_enabled: data.autonomous_enabled ?? false,
-    brief_frequency: ["daily", "weekly", "manual"].includes(data.brief_frequency || "") ? data.brief_frequency : "daily",
-    brief_email: data.brief_email || null,
     updated_at: new Date().toISOString(),
   }
 

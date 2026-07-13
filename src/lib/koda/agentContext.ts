@@ -69,8 +69,11 @@ function extractFeedbackPatterns(
   const sent = moves.filter((m) => m.status === "sent");
   const editedEvents = events.filter((e) => e.event_type === "edited");
 
-  // Types the user tends to accept/send (use both for pattern detection)
-  const acceptedAndSent = moves.filter((m) => m.status === "accepted" || m.status === "sent");
+  // Types the user acted on: accepted, completed, or legacy sent all signal
+  // "more like this".
+  const acceptedAndSent = moves.filter(
+    (m) => m.status === "accepted" || m.status === "sent" || m.status === "completed"
+  );
   const boostTypes = countByType(acceptedAndSent);
   const reduceTypes = countByType(rejected);
 

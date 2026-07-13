@@ -41,13 +41,15 @@ export default async function TalkPage() {
   let extracted: OnboardingExtracted = {};
   if (conversation) {
     extracted = (conversation as KodaConversation).extracted ?? {};
+    // Most recent 100, oldest-first for display (ascending with a limit would
+    // truncate the newest turns of a long conversation).
     const { data: messageRows } = await supabase
       .from("koda_messages")
       .select("*")
       .eq("conversation_id", (conversation as KodaConversation).id)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(100);
-    messages = (messageRows ?? []) as KodaMessage[];
+    messages = ((messageRows ?? []) as KodaMessage[]).reverse();
   }
 
   const chatMessages: ChatMessage[] = messages.map((m) => ({
