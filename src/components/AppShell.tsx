@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { KodaLogo } from "@/components/KodaLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -21,12 +22,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <nav className="sticky top-0 z-50 border-b border-border/40 bg-background/90 backdrop-blur-md relative">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6">
           <Link href="/inbox" className="flex items-center gap-2">
-            <div className="status-dot" />
+            <KodaLogo size={26} />
             <span className="font-heading text-xl font-bold tracking-tight text-foreground">
               Koda
             </span>
           </Link>
           <div className="flex items-center gap-4">
+            <Link
+              href="/talk"
+              className={`font-system transition-colors ${
+                pathname.startsWith("/talk")
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Talk to Koda
+            </Link>
             <Link
               href="/settings"
               className={`font-system transition-colors ${

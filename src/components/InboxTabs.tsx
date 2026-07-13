@@ -8,8 +8,8 @@ import type { RecruitingMove, MoveStatus } from "@/lib/types";
 const TAB_CONFIG: { label: string; status: MoveStatus; value: number }[] = [
   { label: "Today", status: "generated", value: 0 },
   { label: "Saved", status: "saved", value: 1 },
-  { label: "Sent", status: "sent", value: 2 },
-  { label: "Rejected", status: "rejected", value: 3 },
+  { label: "Completed", status: "completed", value: 2 },
+  { label: "Not relevant", status: "rejected", value: 3 },
 ];
 
 function groupMoves(moves: RecruitingMove[]) {
@@ -19,12 +19,15 @@ function groupMoves(moves: RecruitingMove[]) {
     saved: [],
     sent: [],
     rejected: [],
+    completed: [],
   };
   for (const move of moves) {
     groups[move.status].push(move);
   }
-  // Merge accepted into generated for the "Today" tab
+  // Today = fresh and accepted moves. Legacy 'sent' rows (from before the
+  // Send action was removed) group with Completed so they never vanish.
   groups.generated = [...groups.generated, ...groups.accepted];
+  groups.completed = [...groups.completed, ...groups.sent];
   return groups;
 }
 
@@ -46,8 +49,8 @@ function EmptyState({ status }: { status: MoveStatus }) {
 
   const messages: Record<string, string> = {
     saved: "Moves you save for later will appear here.",
-    sent: "Moves you mark as sent will appear here.",
-    rejected: "Moves you pass on will appear here.",
+    completed: "Moves you mark completed will appear here.",
+    rejected: "Moves you mark as not relevant will appear here.",
   };
 
   return (

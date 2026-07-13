@@ -13,6 +13,11 @@ export interface Profile {
   linkedin_url: string | null;
   focus_options: string[];
   semester_goal: string | null;
+  contacts_notes: string | null;
+  recruiting_stage: string | null;
+  timeline: string | null;
+  proof_points: string | null;
+  success_definition: string | null;
   autonomous_enabled: boolean;
   brief_frequency: string;
   brief_email: string | null;
@@ -21,7 +26,11 @@ export interface Profile {
   updated_at: string;
 }
 
-export type MoveStatus = "generated" | "accepted" | "rejected" | "sent" | "saved";
+// 'sent' is a legacy status kept for existing rows; the UI and API no longer
+// accept it (Koda has no sending integration, so nothing may claim "sent").
+export type MoveStatus = "generated" | "accepted" | "rejected" | "sent" | "saved" | "completed";
+
+export type MoveSourceStatus = "user_provided" | "inferred" | "ai_suggested";
 
 export type MoveType =
   | "opportunity"
@@ -37,6 +46,7 @@ export type MoveEventType =
   | "edited"
   | "sent"
   | "saved"
+  | "completed"
   | "regenerated";
 
 export interface RecruitingMove {
@@ -54,8 +64,89 @@ export interface RecruitingMove {
   source_note: string | null;
   confidence: number;
   status: MoveStatus;
+  brief_id: string | null;
+  priority: string | null;
+  effort: string | null;
+  effort_bucket: EffortBucket | null;
+  actual_effort_bucket: EffortBucket | null;
+  expected_outcome: string | null;
+  source_status: MoveSourceStatus;
   created_at: string;
   updated_at: string;
+}
+
+/** Broad effort sizing: quick (under 15 min), focused (15-45 min),
+ * project (multiple sessions). Predictions are calibrated against the
+ * actual bucket users report at completion. */
+export type EffortBucket = "quick" | "focused" | "project";
+
+// --- Talk to Koda types ---
+
+export interface Brief {
+  id: string;
+  user_id: string;
+  source: "onboarding" | "manual" | "scheduled";
+  brief_date: string;
+  summary: string | null;
+  created_at: string;
+}
+
+export type ConversationKind = "onboarding" | "ongoing";
+export type ConversationStatus = "active" | "completed";
+
+/**
+ * Structured fields extracted during conversational onboarding.
+ * This object (not the transcript) is the source of truth for resume/review.
+ */
+export interface OnboardingExtracted {
+  name?: string;
+  school?: string;
+  year?: string;
+  target_roles?: string[];
+  target_companies?: string[];
+  recruiting_stage?: string;
+  timeline?: string;
+  locations?: string[];
+  work_auth?: string;
+  contacts?: string;
+  proof_points?: string;
+  success_definition?: string;
+}
+
+export interface KodaConversation {
+  id: string;
+  user_id: string;
+  kind: ConversationKind;
+  status: ConversationStatus;
+  extracted: OnboardingExtracted;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Relationship {
+  id: string;
+  user_id: string;
+  person_name: string;
+  organization: string | null;
+  role_title: string | null;
+  context: string | null;
+  source_message: string | null;
+  source_message_id: string | null;
+  interaction_date: string | null;
+  follow_up_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KodaMessage {
+  id: string;
+  conversation_id: string;
+  user_id: string;
+  role: "user" | "koda";
+  content: string;
+  input_mode: "text" | "voice";
+  payload: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface MoveEvent {
@@ -86,4 +177,5 @@ export interface AgentContext {
   prior_moves: RecruitingMove[];
   move_events: MoveEvent[];
   feedback: FeedbackPattern;
+  relationships: Relationship[];
 }

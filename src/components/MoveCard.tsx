@@ -5,57 +5,88 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Check,
-  X,
-  Bookmark,
-  Send,
-  ChevronDown,
-  ChevronUp,
-  Save,
-} from "lucide-react";
-import type { RecruitingMove, MoveStatus, MoveType } from "@/lib/types";
+import { Input } from "@/components/ui/input";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Save, Bookmark, X } from "lucide-react";
+import type { EffortBucket, MoveSourceStatus, MoveType, RecruitingMove } from "@/lib/types";
 
-const TYPE_STYLES: Record<MoveType, string> = {
-  opportunity: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
-  person_to_contact: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  follow_up: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  proof_of_work: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-  application_strategy: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+// Category color lives only in this small text label; cards stay neutral.
+const TYPE_TEXT: Record<MoveType, string> = {
+  opportunity: "text-teal-700 dark:text-teal-400",
+  person_to_contact: "text-blue-700 dark:text-blue-400",
+  follow_up: "text-amber-700 dark:text-amber-500",
+  proof_of_work: "text-purple-700 dark:text-purple-400",
+  application_strategy: "text-emerald-700 dark:text-emerald-400",
 };
 
 const TYPE_LABELS: Record<MoveType, string> = {
   opportunity: "Opportunity",
-  person_to_contact: "Person to Contact",
-  follow_up: "Follow Up",
-  proof_of_work: "Proof of Work",
-  application_strategy: "Application Strategy",
+  person_to_contact: "Person to contact",
+  follow_up: "Follow up",
+  proof_of_work: "Proof of work",
+  application_strategy: "Strategy",
+};
+
+const EFFORT_LABELS: Record<EffortBucket, string> = {
+  quick: "Quick · under 15 min",
+  focused: "Focused · 15-45 min",
+  project: "Project · multiple sessions",
+};
+
+const SOURCE_LABELS: Record<MoveSourceStatus, string> = {
+  user_provided: "From what you told Koda",
+  inferred: "Inferred from your profile",
+  ai_suggested: "Koda's suggestion",
 };
 
 export function MoveCard({ move }: { move: RecruitingMove }) {
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(move.outreach_draft ?? "");
   const [saving, setSaving] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [collecting, setCollecting] = useState<"effort" | "feedback" | null>(null);
+  const [feedback, setFeedback] = useState("");
   const router = useRouter();
 
   const subtitle = [move.company, move.person].filter(Boolean).join(" · ");
+  const completed = move.status === "completed" || move.status === "sent";
+  const whyNow = move.fit_reason ?? move.expected_outcome;
+  const effortLabel = move.effort_bucket
+    ? EFFORT_LABELS[move.effort_bucket]
+    : move.effort ?? move.follow_up_timing;
 
-  async function updateStatus(status: MoveStatus) {
-    setActionLoading(status);
+  async function patch(payload: Record<string, unknown>, errorMessage: string): Promise<boolean> {
+    setBusy(true);
     try {
       const res = await fetch(`/api/moves/${move.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to update");
+      if (!res.ok) throw new Error();
       router.refresh();
+      return true;
     } catch {
-      toast.error("Could not update move");
+      toast.error(errorMessage);
+      return false;
     } finally {
-      setActionLoading(null);
+      setBusy(false);
     }
+  }
+
+  async function complete(actualBucket?: EffortBucket) {
+    const ok = await patch(
+      { status: "completed", ...(actualBucket ? { actual_effort_bucket: actualBucket } : {}) },
+      "Could not update move"
+    );
+    if (ok) setCollecting(null);
+  }
+
+  async function reject(withFeedback: string) {
+    const ok = await patch(
+      { status: "rejected", ...(withFeedback.trim() ? { feedback: withFeedback.trim() } : {}) },
+      "Could not update move"
+    );
+    if (ok) setCollecting(null);
   }
 
   async function saveDraft() {
@@ -66,7 +97,7 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ outreach_draft: draft }),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) throw new Error();
       toast.success("Draft saved");
       router.refresh();
     } catch {
@@ -78,145 +109,187 @@ export function MoveCard({ move }: { move: RecruitingMove }) {
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm move-card overflow-hidden">
-      {/* Header */}
-      <div className="px-5 pt-5 pb-3 sm:px-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-2 min-w-0">
-            <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${TYPE_STYLES[move.type]}`}>
-              {TYPE_LABELS[move.type]}
-            </span>
-            <h3 className="text-base font-heading font-semibold text-foreground leading-snug">
-              {move.title}
-            </h3>
-            {subtitle && (
-              <p className="text-sm text-muted-foreground">{subtitle}</p>
-            )}
-          </div>
+      {/* Collapsed: the action, why now, effort, one dominant CTA. */}
+      <div className="px-5 pt-4 pb-4 sm:px-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className={`text-[11px] font-semibold uppercase tracking-wider ${TYPE_TEXT[move.type]}`}>
+            {TYPE_LABELS[move.type]}
+          </span>
+          {effortLabel && (
+            <span className="font-system text-muted-foreground shrink-0">{effortLabel}</span>
+          )}
+        </div>
+
+        <h3 className="mt-2 text-base font-heading font-semibold text-foreground leading-snug">
+          {move.title}
+        </h3>
+        {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
+        {whyNow && (
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{whyNow}</p>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {!completed && collecting === null && (
+            <>
+              <Button
+                onClick={() => setCollecting("effort")}
+                disabled={busy}
+                className="h-9 rounded-lg bg-primary px-4 font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
+              >
+                <CheckCheck className="size-4" aria-hidden />
+                <span>Mark completed</span>
+              </Button>
+              {move.status !== "saved" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => patch({ status: "saved" }, "Could not update move")}
+                  disabled={busy}
+                  className="text-muted-foreground"
+                >
+                  <Bookmark className="size-4" aria-hidden />
+                  <span>Save for later</span>
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCollecting("feedback")}
+                disabled={busy}
+                className="text-muted-foreground hover:text-red-600"
+              >
+                <X className="size-4" aria-hidden />
+                <span>Not relevant</span>
+              </Button>
+            </>
+          )}
+
+          {completed && (
+            <p className="font-system text-muted-foreground flex items-center gap-1.5">
+              <Check className="size-3.5" aria-hidden />
+              Completed. Koda uses this to shape your next brief.
+            </p>
+          )}
+
           <button
             onClick={() => setExpanded(!expanded)}
             aria-label={expanded ? "Collapse details" : "Expand details"}
-            className="shrink-0 flex items-center justify-center size-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+            className="ml-auto flex items-center justify-center size-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
           >
-            {expanded ? (
-              <ChevronUp className="size-4" />
-            ) : (
-              <ChevronDown className="size-4" />
-            )}
+            {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
           </button>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="px-5 pb-3 sm:px-6 space-y-2">
-        {move.fit_reason && (
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {move.fit_reason}
-          </p>
+        {/* Completion: collect the real effort bucket to calibrate estimates. */}
+        {collecting === "effort" && (
+          <div className="mt-3 rounded-lg border border-border bg-background px-4 py-3 space-y-2">
+            <p className="text-sm font-medium text-foreground">Done. How long did it actually take?</p>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(EFFORT_LABELS) as EffortBucket[]).map((bucket) => (
+                <Button
+                  key={bucket}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => complete(bucket)}
+                  disabled={busy}
+                  className="rounded-lg"
+                >
+                  {EFFORT_LABELS[bucket]}
+                </Button>
+              ))}
+              <Button variant="ghost" size="sm" onClick={() => complete()} disabled={busy} className="text-muted-foreground">
+                Skip
+              </Button>
+            </div>
+          </div>
         )}
 
-        {move.suggested_action && (
-          <p className="text-sm font-medium text-foreground">
-            {move.suggested_action}
-          </p>
-        )}
-
-        {move.source_note && (
-          <p className="text-xs italic text-primary/70">
-            Why this move: {move.source_note}
-          </p>
-        )}
-
-        {expanded && (
-          <div className="space-y-4 border-t border-border/40 pt-4 mt-3" style={{ animation: "fadeSlideIn 180ms ease-out" }}>
-            {move.outreach_draft && (
-              <div className="space-y-2">
-                <label className="font-system text-muted-foreground">
-                  Outreach Draft
-                </label>
-                <Textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  rows={4}
-                  className="text-sm rounded-lg"
-                />
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={saveDraft}
-                    disabled={saving || draft === move.outreach_draft}
-                    className="rounded-lg"
-                  >
-                    <Save className="size-3.5" />
-                    <span>{saving ? "Saving..." : "Save draft"}</span>
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {move.proof_of_work_idea && (
-              <div className="space-y-1">
-                <label className="font-system text-muted-foreground">
-                  Proof of Work Idea
-                </label>
-                <p className="text-sm leading-relaxed">{move.proof_of_work_idea}</p>
-              </div>
-            )}
-
-            {move.follow_up_timing && (
-              <div className="space-y-1">
-                <label className="font-system text-muted-foreground">
-                  Follow-up Timing
-                </label>
-                <p className="text-sm leading-relaxed">{move.follow_up_timing}</p>
-              </div>
-            )}
+        {/* Rejection: optional reason sharpens the next brief. */}
+        {collecting === "feedback" && (
+          <div className="mt-3 rounded-lg border border-border bg-background px-4 py-3 space-y-2">
+            <p className="text-sm font-medium text-foreground">Why is it not relevant? Optional, helps the next brief.</p>
+            <div className="flex gap-2">
+              <Input
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Too generic, wrong company, already did it..."
+                aria-label="Why is this move not relevant"
+                className="h-9 rounded-lg text-sm"
+              />
+              <Button size="sm" variant="outline" onClick={() => reject(feedback)} disabled={busy} className="rounded-lg shrink-0">
+                Remove move
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setCollecting(null)} disabled={busy} className="shrink-0 text-muted-foreground">
+                Keep it
+              </Button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Action bar */}
-      <div className="flex items-center gap-1 border-t border-border/40 px-4 py-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("accepted")}
-          disabled={actionLoading !== null}
-          className="text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-        >
-          <Check className="size-4" />
-          <span>Accept</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("rejected")}
-          disabled={actionLoading !== null}
-          className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-900/20"
-        >
-          <X className="size-4" />
-          <span>Reject</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("saved")}
-          disabled={actionLoading !== null}
-        >
-          <Bookmark className="size-4" />
-          <span>Save</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => updateStatus("sent")}
-          disabled={actionLoading !== null}
-          className="text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
-        >
-          <Send className="size-4" />
-          <span>Sent</span>
-        </Button>
-      </div>
+      {/* Expanded: reasoning, draft, proof of work, provenance, extras. */}
+      {expanded && (
+        <div className="border-t border-border/40 px-5 py-4 sm:px-6 space-y-4" style={{ animation: "fadeSlideIn 180ms ease-out" }}>
+          {move.suggested_action && (
+            <div className="space-y-1">
+              <p className="font-system text-muted-foreground">First step</p>
+              <p className="text-sm leading-relaxed text-foreground">{move.suggested_action}</p>
+            </div>
+          )}
+
+          {move.expected_outcome && move.expected_outcome !== whyNow && (
+            <div className="space-y-1">
+              <p className="font-system text-muted-foreground">Expected outcome</p>
+              <p className="text-sm leading-relaxed">{move.expected_outcome}</p>
+            </div>
+          )}
+
+          {move.outreach_draft && (
+            <div className="space-y-2">
+              <p className="font-system text-muted-foreground">Outreach draft</p>
+              <Textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={4}
+                aria-label="Outreach draft"
+                className="text-sm rounded-lg"
+              />
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={saveDraft}
+                  disabled={saving || draft === move.outreach_draft}
+                  className="rounded-lg"
+                >
+                  <Save className="size-3.5" aria-hidden />
+                  <span>{saving ? "Saving..." : "Save draft"}</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {move.proof_of_work_idea && (
+            <div className="space-y-1">
+              <p className="font-system text-muted-foreground">Proof of work angle</p>
+              <p className="text-sm leading-relaxed">{move.proof_of_work_idea}</p>
+            </div>
+          )}
+
+          {move.follow_up_timing && (
+            <div className="space-y-1">
+              <p className="font-system text-muted-foreground">Timing</p>
+              <p className="text-sm leading-relaxed">{move.follow_up_timing}</p>
+            </div>
+          )}
+
+          <p className="font-system text-muted-foreground border-t border-border/40 pt-3">
+            {SOURCE_LABELS[move.source_status] ?? SOURCE_LABELS.ai_suggested}
+            {move.source_note && ` · ${move.source_note}`}
+            {typeof move.confidence === "number" && ` · ${Math.round(move.confidence * 100)}% fit`}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

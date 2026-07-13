@@ -50,3 +50,8 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# agent artifacts
+.agent/reviews/
+.claude/settings.local.json
+.claude/worktrees/

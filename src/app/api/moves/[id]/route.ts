@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { logKodaEvent, type KodaEventName } from "@/lib/koda/events";
 import type { MoveEventType } from "@/lib/types";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// 'sent' is intentionally absent: no sending integration exists, so the API
+// must not accept a claim that a message went out. Legacy 'sent' rows remain
+// readable but no new ones can be created.
 const STATUS_TO_EVENT: Record<string, MoveEventType> = {
   generated: "generated",
   accepted: "accepted",
   rejected: "rejected",
-  sent: "sent",
   saved: "saved",
+  completed: "completed",
 };
 
 const MAX_DRAFT_LENGTH = 10000;
@@ -41,10 +45,23 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { status, outreach_draft } = body as {
+  const { status, outreach_draft, actual_effort_bucket, feedback } = body as {
     status?: string;
     outreach_draft?: string;
+    actual_effort_bucket?: string;
+    feedback?: string;
   };
+
+  const VALID_BUCKETS = ["quick", "focused", "project"];
+  if (actual_effort_bucket !== undefined && !VALID_BUCKETS.includes(actual_effort_bucket)) {
+    return NextResponse.json(
+      { error: `Invalid effort bucket. Must be one of: ${VALID_BUCKETS.join(", ")}` },
+      { status: 400 }
+    );
+  }
+  if (feedback !== undefined && (typeof feedback !== "string" || feedback.length > 500)) {
+    return NextResponse.json({ error: "Invalid feedback" }, { status: 400 });
+  }
 
   // Validate outreach_draft length
   if (outreach_draft !== undefined && outreach_draft.length > MAX_DRAFT_LENGTH) {
@@ -87,6 +104,11 @@ export async function PATCH(
     updates.outreach_draft = outreach_draft;
   }
 
+  // Actual effort arrives with completion and calibrates future estimates.
+  if (actual_effort_bucket !== undefined) {
+    updates.actual_effort_bucket = actual_effort_bucket;
+  }
+
   const { data: updated, error: updateError } = await supabase
     .from("recruiting_moves")
     .update(updates)
@@ -109,16 +131,32 @@ export async function PATCH(
     eventType = "edited";
   }
 
-  // Insert move_event
+  // Insert move_event. Optional rejection feedback (why a move was not
+  // relevant) rides in metadata and feeds future generations.
   const { error: eventError } = await supabase.from("move_events").insert({
     move_id: id,
     user_id: user.id,
     event_type: eventType,
-    metadata: {},
+    metadata: {
+      ...(feedback?.trim() ? { feedback: feedback.trim() } : {}),
+      ...(actual_effort_bucket ? { actual_effort_bucket } : {}),
+    },
   });
 
   if (eventError) {
     console.error("Failed to insert move event:", eventError);
+  }
+
+  const PRODUCT_EVENTS: Record<string, KodaEventName> = {
+    accepted: "move_accepted",
+    rejected: "move_rejected",
+    saved: "move_saved",
+    completed: "move_completed",
+    edited: "move_edited",
+  };
+  const productEvent = PRODUCT_EVENTS[eventType];
+  if (productEvent) {
+    logKodaEvent(supabase, user.id, productEvent, { move_id: id, move_type: updated.type });
   }
 
   return NextResponse.json({ move: updated });

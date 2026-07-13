@@ -4,13 +4,22 @@ import { getCronSecret } from "@/lib/env";
 import { generateRecruitingMoves } from "@/lib/koda/generateRecruitingMoves";
 import { buildAgentContext } from "@/lib/koda/agentContext";
 import { sendBriefEmail } from "@/lib/koda/email";
+import { logKodaEvent } from "@/lib/koda/events";
 import type { Profile } from "@/lib/types";
 
 /**
- * Cron endpoint for autonomous Koda briefs.
+ * Cron endpoint for scheduled Koda briefs.
  * Called by Vercel Cron on schedule. Protected by CRON_SECRET.
- * Generates moves for confirmed users with autonomous_enabled = true
- * and emails them a digest.
+ *
+ * Consent model:
+ * - Generating an in-app scheduled brief requires autonomous_enabled plus a
+ *   daily/weekly frequency (chosen in onboarding review or settings).
+ * - Sending the email digest additionally requires brief_email AND
+ *   brief_confirmed (the email double-opt-in flow).
+ *
+ * Idempotent per day: a partial unique index on briefs
+ * (user_id, brief_date where source='scheduled') means a rerun cannot create
+ * a second brief for the same user and day.
  */
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -34,12 +43,13 @@ export async function GET(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  // Find all users with autonomous briefs enabled
+  // Users who consented to scheduled briefs (manual users are excluded even
+  // if flags drift).
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
     .select("*")
     .eq("autonomous_enabled", true)
-    .eq("brief_confirmed", true);
+    .in("brief_frequency", ["daily", "weekly"]);
 
   if (profilesError) {
     console.error("[cron:brief] Failed to fetch profiles:", profilesError);
@@ -50,10 +60,10 @@ export async function GET(request: NextRequest) {
   }
 
   if (!profiles || profiles.length === 0) {
-    return NextResponse.json({ processed: 0, message: "No users with autonomous briefs enabled" });
+    return NextResponse.json({ processed: 0, message: "No users with scheduled briefs enabled" });
   }
 
-  const results: Array<{ userId: string; success: boolean; error?: string }> = [];
+  const results: Array<{ userId: string; success: boolean; skipped?: string; error?: string }> = [];
 
   // Check if today is Monday for weekly users
   const today = new Date();
@@ -66,15 +76,36 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Build agent context for this user
-      const agentContext = await buildAgentContext(supabase, profile.user_id);
+      // Claim today's scheduled brief BEFORE generating: the unique index
+      // makes a rerun (or a concurrent run) a clean skip, never a duplicate.
+      const { data: brief, error: claimError } = await supabase
+        .from("briefs")
+        .insert({ user_id: profile.user_id, source: "scheduled" })
+        .select()
+        .single();
 
-      // Generate moves
-      const moves = await generateRecruitingMoves(profile, agentContext);
+      if (claimError) {
+        if (claimError.code === "23505") {
+          results.push({ userId: profile.user_id, success: true, skipped: "already_generated_today" });
+          continue;
+        }
+        throw new Error(`Brief claim failed: ${claimError.message}`);
+      }
 
-      // Insert moves into DB
+      let moves;
+      try {
+        const agentContext = await buildAgentContext(supabase, profile.user_id);
+        moves = await generateRecruitingMoves(profile, agentContext);
+      } catch (generateError) {
+        // Release the claim so the next run can retry instead of leaving an
+        // empty phantom brief.
+        await supabase.from("briefs").delete().eq("id", brief.id);
+        throw generateError;
+      }
+
       const movesToInsert = moves.map((move) => ({
         user_id: profile.user_id,
+        brief_id: brief.id,
         title: move.title,
         type: move.type,
         company: move.company,
@@ -86,6 +117,11 @@ export async function GET(request: NextRequest) {
         follow_up_timing: move.follow_up_timing,
         source_note: move.source_note,
         confidence: move.confidence,
+        priority: move.priority,
+        effort: move.effort,
+        effort_bucket: move.effort_bucket,
+        expected_outcome: move.expected_outcome,
+        source_status: move.source_status,
         status: "generated" as const,
       }));
 
@@ -95,6 +131,7 @@ export async function GET(request: NextRequest) {
         .select();
 
       if (insertError) {
+        await supabase.from("briefs").delete().eq("id", brief.id);
         throw new Error(`Insert failed: ${insertError.message}`);
       }
 
@@ -104,7 +141,7 @@ export async function GET(request: NextRequest) {
           move_id: move.id,
           user_id: profile.user_id,
           event_type: "generated" as const,
-          metadata: { source: "autonomous_brief" },
+          metadata: { source: "autonomous_brief", brief_id: brief.id },
         }));
 
         const { error: eventsError } = await supabase.from("move_events").insert(events);
@@ -113,8 +150,8 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Send email digest if user has an email set
-      if (profile.brief_email) {
+      // Email digest only with a confirmed address (email double-opt-in).
+      if (profile.brief_email && profile.brief_confirmed) {
         const emailResult = await sendBriefEmail({
           to: profile.brief_email,
           userName: profile.name || "there",
@@ -125,10 +162,15 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      logKodaEvent(supabase, profile.user_id, "scheduled_brief_generated", {
+        frequency: profile.brief_frequency,
+        emailed: Boolean(profile.brief_email && profile.brief_confirmed),
+      });
       results.push({ userId: profile.user_id, success: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       console.error(`[cron:brief] Error for user ${profile.user_id}:`, msg);
+      logKodaEvent(supabase, profile.user_id, "scheduled_brief_failed");
       results.push({ userId: profile.user_id, success: false, error: msg });
     }
   }

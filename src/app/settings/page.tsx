@@ -49,11 +49,11 @@ export default function SettingsPage() {
   })
 
   useEffect(() => {
-    const briefStatus = new URLSearchParams(window.location.search).get("brief")
-    if (briefStatus === "confirmed") setBriefNotice("Your email is confirmed. Autonomous briefs are now active.")
-    if (briefStatus === "invalid") setError("That confirmation link is invalid or expired. Enable briefs again to request a new one.")
-
     async function loadProfile() {
+      const briefStatus = new URLSearchParams(window.location.search).get("brief")
+      if (briefStatus === "confirmed") setBriefNotice("Your email is confirmed. Autonomous briefs are now active.")
+      if (briefStatus === "invalid") setError("That confirmation link is invalid or expired. Enable briefs again to request a new one.")
+
       const supabase = createClient()
       const {
         data: { user },
@@ -130,41 +130,46 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       const splitCommas = (s: string) => s.split(",").map(v => v.trim()).filter(Boolean)
-      const briefChanged = form.brief_frequency !== savedBrief.frequency || form.brief_email.trim() !== savedBrief.email
-      const needsConfirmation = form.autonomous_enabled && (!savedBrief.enabled || !savedBrief.confirmed || briefChanged)
+      // Profile fields only; scheduled-brief consent and email are managed
+      // exclusively by /api/briefs below.
       await saveProfile({
         ...form,
-        autonomous_enabled: needsConfirmation ? false : form.autonomous_enabled,
         target_roles: splitCommas(form.target_roles),
         industries: splitCommas(form.industries),
         locations: splitCommas(form.locations),
       })
 
-      if (needsConfirmation || !form.autonomous_enabled) {
+      const frequency = ["daily", "weekly"].includes(form.brief_frequency) ? form.brief_frequency : "daily"
+      const email = form.brief_email.trim()
+      const briefChanged =
+        form.autonomous_enabled !== savedBrief.enabled ||
+        (form.autonomous_enabled && (frequency !== savedBrief.frequency || email !== savedBrief.email))
+
+      if (briefChanged) {
         const response = await fetch("/api/briefs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             enabled: form.autonomous_enabled,
-            email: form.brief_email,
-            frequency: form.brief_frequency,
+            email,
+            frequency,
           }),
         })
-        const result = await response.json() as { error?: string }
-        if (!response.ok) throw new Error(result.error || "Could not update autonomous briefs")
-        if (needsConfirmation) {
-          setBriefNotice("Check your email to confirm briefs. They will remain off until you confirm.")
-          setSavedBrief((prev) => ({ ...prev, enabled: false, confirmed: false }))
+        const result = await response.json().catch(() => ({})) as { error?: string; enabled?: boolean; pending?: boolean; emailDigest?: boolean }
+        if (!response.ok) throw new Error(result.error || "Could not update scheduled briefs")
+        if (result.pending) {
+          setBriefNotice("Scheduled briefs are on. Check your email to confirm the digest; no email is sent until you confirm.")
+          setSavedBrief({ enabled: true, confirmed: false, frequency, email: "" })
+        } else if (result.enabled) {
+          setSavedBrief({
+            enabled: true,
+            confirmed: Boolean(result.emailDigest),
+            frequency,
+            email: result.emailDigest ? email : "",
+          })
         } else {
-          setSavedBrief((prev) => ({ ...prev, enabled: false, confirmed: false }))
+          setSavedBrief({ enabled: false, confirmed: false, frequency: "manual", email: "" })
         }
-      } else {
-        setSavedBrief({
-          enabled: form.autonomous_enabled,
-          confirmed: savedBrief.confirmed,
-          frequency: form.brief_frequency,
-          email: form.brief_email.trim(),
-        })
       }
       setSuccess(true)
     } catch (err) {
@@ -380,9 +385,11 @@ export default function SettingsPage() {
           <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="autonomous_enabled">Enable Autonomous Briefs</Label>
+                <Label htmlFor="autonomous_enabled">Scheduled Koda Briefs</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Koda will generate moves and email you a digest
+                  Off means manual only: you run Koda from your inbox when you
+                  want a brief. On, Koda prepares briefs on a schedule and can
+                  email you a digest.
                 </p>
               </div>
               <button
@@ -406,7 +413,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Frequency</Label>
                   <Select
-                    value={form.brief_frequency}
+                    value={["daily", "weekly"].includes(form.brief_frequency) ? form.brief_frequency : "daily"}
                     onValueChange={(val) => update("brief_frequency", val ?? "daily")}
                   >
                     <SelectTrigger className="w-full h-11 rounded-lg">

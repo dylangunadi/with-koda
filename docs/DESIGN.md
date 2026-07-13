@@ -14,16 +14,13 @@
 - **Body**: Geist Sans, 15px base
 - **Headings**: Newsreader (serif), `font-heading` class
 - **System labels**: Geist Mono, 11px, uppercase, 0.06em letter-spacing, `font-system` class
-- **Move type badges**: 10px, uppercase, semibold, wide tracking
+- **Move type labels**: 11px, uppercase, semibold, wide tracking, color-by-type text only
 
-### Move Type Colors
-| Type | Light |
-|------|-------|
-| Opportunity | teal-100/teal-800 |
-| Person to contact | blue-100/blue-800 |
-| Follow up | amber-100/amber-800 |
-| Proof of work | purple-100/purple-800 |
-| Application strategy | emerald-100/emerald-800 |
+### Move Cards
+- Neutral cards and borders; category color appears only as a small uppercase text label (teal/blue/amber/purple/emerald by type)
+- Collapsed: type label + effort bucket (mono, top corners), serif title, one why-now paragraph, one dominant CTA (Mark completed, primary teal) with quiet Save for later / Not relevant secondaries
+- Expanded: first step, editable draft, proof-of-work angle, timing, and a single mono provenance line (source status · source note · confidence)
+- Completing collects the actual effort bucket inline (Quick / Focused / Project / Skip); Not relevant offers an optional reason
 
 ### Layout
 - Max width: `max-w-6xl` (landing), `max-w-4xl` (app shell)
@@ -37,6 +34,16 @@
 - **Cards**: `rounded-xl border border-border bg-card shadow-sm`
 - **Badges**: `rounded-md px-2 py-0.5`
 - **Grain overlay**: SVG noise texture with CSS animation
+
+### Talk to Koda Chat Surface
+- Fixed viewport (`h-dvh`, `src/components/talk/TalkToKoda.tsx`): the transcript is the only scrolling region and auto-follows new messages; the header and composer are anchored, with `env(safe-area-inset-bottom)` padding on mobile — the page itself never grows or scrolls
+- Koda messages carry the Koda logo mark (`src/components/KodaLogo.tsx`: teal circle, monoline K with a dot for its upper arm) beside a mono "Koda" label, with a pulsing caret while streaming; user messages are right-aligned accent bubbles
+- The header shows the logo + wordmark; there is no visible progress counter during onboarding (a hidden `data-onboarding-remaining` attribute keeps tests deterministic) — the conversation should feel natural, not like a form
+- Completed Koda replies are announced once through a visually hidden `aria-live="polite"` region; the transcript itself is not a live region (streaming deltas would be re-announced word by word)
+- The composer is pinned at the bottom in every state; the "Offline sample mode" chip (mono, muted) appears whenever the deterministic provider is active — never hide it
+- The end-of-onboarding review pops up as a modal over the dimmed chat (never buried at the bottom of the transcript)
+- Confirmation cards (relationship memory, profile diffs) are standard cards with a mono question label ("Save to memory?" / "Update your profile?"), Confirm + "Not now" buttons, and old values struck through in diffs
+- Voice calls (orb, mic, TTS) live on the `feat/voice-call-onboarding` branch, not here
 
 ## Required States
 
@@ -75,10 +82,14 @@
 - First person for actions: "Save draft", "Run Koda"
 - Second person for descriptions: "Your moves", "Your profile"
 - No jargon or corporate language
+- No em dashes in user-facing copy
 - Banned phrases (from prompts): "circling back", "touching base", "bandwidth", "leverage"
+- Never imply an external action happened: there is no "Send"/"Sent" anywhere; accepting a move means intent, completing means the user did it themselves
+- Label AI provenance honestly: move cards show a mono source line ("From what you told Koda" / "Inferred from your profile" / "Koda's suggestion") with confidence and effort
 
 ### Destructive Actions
-- Reject moves use red styling (`text-red-500`)
+- "Not relevant" (move rejection) uses red styling (`text-red-500`)
+- Conversation proposals never write without explicit confirmation (Confirm / "Not now")
 - Sign out is text-only, no confirmation dialog (low risk — re-sign-in is easy)
 - No delete actions currently exist in the UI
 - Future destructive actions should require confirmation dialog

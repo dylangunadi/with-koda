@@ -1,9 +1,21 @@
 import Link from "next/link";
+import { KodaLogo } from "@/components/KodaLogo";
+import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { WaitlistForm } from "@/components/WaitlistForm";
 import { AgentStatus } from "@/components/AgentStatus";
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  // Auth emails configured with a bare site URL land here with ?code=...;
+  // hand the code to the real callback so the click still signs the user in.
+  const { code } = await searchParams;
+  if (code) {
+    redirect(`/auth/callback?code=${encodeURIComponent(code)}`);
+  }
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Grain overlay */}
@@ -13,7 +25,7 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="status-dot" />
+            <KodaLogo size={26} />
             <span className="font-heading text-lg font-semibold tracking-tight text-foreground">
               Koda
             </span>

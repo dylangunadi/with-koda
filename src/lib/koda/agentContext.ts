@@ -5,6 +5,7 @@ import type {
   MoveType,
   AgentContext,
   FeedbackPattern,
+  Relationship,
 } from "@/lib/types";
 
 /**
@@ -40,12 +41,21 @@ export async function buildAgentContext(
     events = (eventsData ?? []) as MoveEvent[];
   }
 
+  // Relationship memory captured through Talk to Koda (user-confirmed only).
+  const { data: relationshipRows } = await supabase
+    .from("relationships")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
   const feedback = extractFeedbackPatterns(priorMoves, events);
 
   return {
     prior_moves: priorMoves,
     move_events: events,
     feedback,
+    relationships: (relationshipRows ?? []) as Relationship[],
   };
 }
 
@@ -59,8 +69,11 @@ function extractFeedbackPatterns(
   const sent = moves.filter((m) => m.status === "sent");
   const editedEvents = events.filter((e) => e.event_type === "edited");
 
-  // Types the user tends to accept/send (use both for pattern detection)
-  const acceptedAndSent = moves.filter((m) => m.status === "accepted" || m.status === "sent");
+  // Types the user acted on: accepted, completed, or legacy sent all signal
+  // "more like this".
+  const acceptedAndSent = moves.filter(
+    (m) => m.status === "accepted" || m.status === "sent" || m.status === "completed"
+  );
   const boostTypes = countByType(acceptedAndSent);
   const reduceTypes = countByType(rejected);
 
@@ -75,6 +88,29 @@ function extractFeedbackPatterns(
   }
   if (sent.length > 0 && accepted.length > sent.length) {
     toneSignals.push("User accepts more moves than they send — they may be selective about outreach timing.");
+  }
+
+  // Effort calibration: compare predicted buckets against what users report
+  // at completion, and steer future sizing accordingly.
+  const BUCKET_ORDER = ["quick", "focused", "project"];
+  const calibrated = moves.filter((m) => m.effort_bucket && m.actual_effort_bucket);
+  if (calibrated.length >= 2) {
+    const drift = calibrated.reduce(
+      (sum, m) =>
+        sum +
+        (BUCKET_ORDER.indexOf(m.actual_effort_bucket as string) -
+          BUCKET_ORDER.indexOf(m.effort_bucket as string)),
+      0
+    );
+    if (drift >= 2) {
+      toneSignals.push(
+        "Effort estimates run LOW for this student: moves regularly take a bucket longer than predicted. Size effort_bucket conservatively (round up)."
+      );
+    } else if (drift <= -2) {
+      toneSignals.push(
+        "Effort estimates run HIGH for this student: moves finish faster than predicted. Size effort_bucket down when in doubt."
+      );
+    }
   }
 
   return {

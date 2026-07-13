@@ -2,104 +2,85 @@
 
 ## Test Stack
 
-- **E2E / Browser**: Playwright (`@playwright/test`)
+- **E2E / Browser**: Playwright (`@playwright/test`), chromium project
 - **Unit / Integration**: None configured yet (no Jest/Vitest)
-- **Config**: `playwright.config.ts`
+- **Config**: `playwright.config.ts` (baseURL `http://localhost:3000`, auto-starts `npm run dev` with `KODA_AI_MOCK=1`)
 
 ## Running Tests
 
 ```bash
-# All Playwright tests (chromium, firefox, webkit)
-npx playwright test
-
-# Single browser
+# All Playwright tests
 npx playwright test --project=chromium
 
 # Specific test file
-npx playwright test tests/example.spec.ts
+npx playwright test tests/onboarding-conversation.spec.ts --project=chromium
 
-# Headed mode (see the browser)
-npx playwright test --headed
-
-# Debug mode
-npx playwright test --debug
-
-# Critical E2E only
+# Critical E2E only (@critical tag)
 bash scripts/e2e-critical.sh
 
-# Full validation
+# Full validation (lint + types + build + tests)
 bash scripts/validate.sh
 ```
 
+In environments that cannot download the pinned Chromium build, point at a cached one:
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium npx playwright test --project=chromium`
+(the config hook is a no-op when the variable is unset).
+
 ## Current Test Files
 
-| File | Status | Purpose |
-|------|--------|---------|
-| `tests/example.spec.ts` | Scaffold | Default Playwright example (visits playwright.dev) |
-| `tests/seed.spec.ts` | Scaffold | Empty test group placeholder |
-
-Both are scaffolds from `npx playwright init` and do not test Koda functionality.
+| File | Purpose |
+|------|---------|
+| `tests/onboarding-conversation.spec.ts` | @critical — signup routes into Talk to Koda, full text onboarding, mid-flow reload resume, structured persistence, review edits, first brief of 3 moves |
+| `tests/returning-user.spec.ts` | @critical — onboarded users bypass onboarding, see the saved brief and move states, `/talk` opens the ongoing conversation |
+| `tests/move-actions.spec.ts` | @critical — Complete (with actual-effort bucket) / Save / Not relevant (with optional reason) persist across reloads into the right tabs; no Send or Accept affordances; API rejects `sent`; draft edits |
+| `tests/onboarding-errors.spec.ts` | AI failure preserves input and permits retry; duplicate submission, repeated confirm, and repeated generation idempotency |
+| `tests/ongoing-talk.spec.ts` | Relationship capture with confirm/decline, goal-update diffs, next-move recommendations |
+| `tests/cron-brief.spec.ts` | Scheduled brief idempotency, consent gating, manual users untouched, secret rejection (serial) |
+| `tests/settings-briefs.spec.ts` | Profile edits never revoke scheduled-brief consent; enable/disable round-trips |
+| `tests/instrumentation.spec.ts` | Activation event trail exists; no user content leaks into event properties |
+| `tests/helpers/` | `env.ts` (.env.local parsing), `db.ts` (service-role seeding/assertions, refuses non-local Supabase), `auth.ts` (UI login/signup) |
 
 ## Test Data
 
-- No test seed data exists yet
-- For Supabase tests, create test users via `supabase.auth.signUp()` in test setup
-- Clean up test data in `afterAll` or use unique identifiers per test run
-- Never use production credentials or real user data in tests
+- Tests create unique users per run (`uniqueEmail()`); seeded users default to `manual` brief frequency so the cron spec never touches them
+- `seedOnboardedUser()` creates a profile, an onboarding brief, and three moves directly via the service role
+- `tests/helpers/db.ts` refuses to run against a non-local Supabase URL unless `KODA_ALLOW_REMOTE_TEST_DB=1` — never point tests at production
+- Local signups get sessions immediately (`enable_confirmations = false` in `supabase/config.toml`)
+
+## AI in Tests
+
+- The Playwright web server pins `KODA_AI_MOCK=1`, so specs run against the deterministic offline provider and never call the live model. If you reuse an already-running dev server, start it with `KODA_AI_MOCK=1` yourself.
+- AI failures are injected with the `x-koda-test-ai: fail` header (honored only in mock mode outside production; it can only cause failures). `/api/talk` streams; specs that parse it directly read the last `data:` frame.
 
 ## Authentication in Browser Tests
 
-- Playwright tests should authenticate by:
-  1. Navigating to `/login`
-  2. Filling email/password form
-  3. Submitting and waiting for redirect
-- Store auth state in `playwright/.auth/` (gitignored)
-- Use Playwright's `storageState` for session reuse across tests
-- The `baseURL` should be set to `http://localhost:3000` when using with dev server
-
-## Critical User Flows (to be tested)
-
-1. **Sign up + onboarding**: Create account, complete 4-step wizard, land on inbox
-2. **Sign in**: Existing user signs in, redirects to inbox
-3. **Generate moves**: Click "Run Koda", see 3 new moves appear
-4. **Move actions**: Accept, reject, save, mark sent on a move
-5. **Edit draft**: Expand move, edit outreach draft, save
-6. **Settings**: Update profile fields, save changes
-7. **Waitlist**: Submit waitlist form on landing page
+- Specs authenticate through the real UI (`loginViaUi` / `signupViaUi` in `tests/helpers/auth.ts`)
+- No committed auth state; `playwright/.auth/` stays gitignored if you add `storageState` later
 
 ## Debugging
 
 ```bash
-# Run with browser visible
-npx playwright test --headed
-
-# Step-through debugger
-npx playwright test --debug
-
-# View last test report
-npx playwright show-report
-
-# View trace from failed test
+npx playwright test --headed        # browser visible
+npx playwright test --debug         # step-through
+npx playwright show-report          # last HTML report
 npx playwright show-trace test-results/<test-name>/trace.zip
 ```
+
+Failed tests leave an `error-context.md` page snapshot in `test-results/<test-name>/`.
 
 ## Artifacts
 
 | Artifact | Location | Gitignored |
 |----------|----------|------------|
 | HTML report | `playwright-report/` | Yes |
-| Test results | `test-results/` | Yes |
-| Traces | `test-results/*/trace.zip` | Yes |
-| Screenshots | `test-results/*/` | Yes |
-| Auth state | `playwright/.auth/` | Yes |
-| Blob report | `blob-report/` | Yes |
+| Test results + traces + failure screenshots | `test-results/` | Yes |
+| Evidence screenshots (committed intentionally) | `docs/screenshots/` | No |
 
 ## Playwright Configuration Notes
 
 - `testDir`: `./tests`
-- `fullyParallel`: true (local), sequential on CI (`workers: 1`)
+- `fullyParallel`: true (local), `workers: 1` on CI; `tests/cron-brief.spec.ts` self-serializes
 - `retries`: 0 (local), 2 (CI)
-- `reporter`: HTML
-- `trace`: on-first-retry
-- `baseURL`: not configured (should be set for app tests)
-- `webServer`: commented out (should be enabled for app tests)
+- `reporter`: HTML; `trace`: on-first-retry; `screenshot`: only-on-failure
+- `baseURL`: `http://localhost:3000`
+- `webServer`: `npm run dev` with `KODA_AI_MOCK: "1"`, reused locally

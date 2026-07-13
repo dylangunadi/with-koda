@@ -8,35 +8,50 @@ with-koda/
     app/
       page.tsx                    # Landing page (marketing + waitlist)
       login/page.tsx              # Email/password auth (client component)
-      onboarding/                 # 4-step profile setup wizard
-        page.tsx                  # Onboarding UI
-        actions.ts                # Server action: saveProfile
-      inbox/                      # Main app — agent inbox
-        page.tsx                  # Server component: fetches moves
+      talk/                       # Talk to Koda (conversational onboarding + ongoing)
+        page.tsx                  # Server component: mode routing + resume
+        actions.ts                # Server action: confirmOnboarding (profile + first brief)
+      onboarding/                 # Legacy route: redirects to /talk
+        page.tsx                  # Redirect
+        actions.ts                # Server action: saveProfile (profile fields only)
+      inbox/                      # Main app — agent inbox / brief surface
+        page.tsx                  # Server component: fetches moves + latest brief
         layout.tsx                # AppShell wrapper
-      settings/                   # Profile editing + autonomous briefs
+      settings/                   # Profile editing + scheduled briefs
         page.tsx                  # Client component: edit profile
         layout.tsx                # AppShell wrapper
       api/
+        talk/route.ts             # POST — conversational turn (onboarding/ongoing)
+        talk/confirm/route.ts     # POST — resolve conversation proposals
+        events/route.ts           # POST — whitelisted client product events
         waitlist/route.ts         # POST — waitlist signup
         moves/route.ts            # GET — list moves
-        moves/generate/route.ts   # POST — generate moves via Claude
-        moves/[id]/route.ts       # PATCH — update move status/draft
-        cron/brief/route.ts       # GET — autonomous brief cron
+        moves/generate/route.ts   # POST — generate a manual brief via the AI provider
+        moves/[id]/route.ts       # PATCH — update move status/draft ('sent' rejected)
+        briefs/route.ts           # POST — scheduled-brief consent + email opt-in
+        briefs/confirm/route.ts   # GET — email double-opt-in confirmation
+        cron/brief/route.ts       # GET — scheduled brief cron (idempotent per day)
     components/
       ui/                         # shadcn/ui primitives
+      talk/                       # TalkToKoda, ReviewConfirm, ConfirmationCard,
+                                  #   VoiceInput, useSpeechRecognition
       AppShell.tsx                # Authenticated layout (nav + sign out)
-      MoveCard.tsx                # Recruiting move card with actions
+      BriefHeader.tsx             # Brief label above the latest brief's moves
+      MoveCard.tsx                # Move card: Accept/Complete/Save/Not relevant
       GenerateMovesButton.tsx     # "Run Koda" trigger
-      InboxTabs.tsx               # Tab view: Today/Saved/Sent/Rejected
+      InboxTabs.tsx               # Tabs: Today/Saved/Completed/Not relevant
       WaitlistForm.tsx            # Landing page waitlist form
-      AgentStatus.tsx             # Animated agent status bar
+      AgentStatus.tsx             # Animated agent status bar (landing only)
     lib/
       supabase/client.ts          # Browser Supabase client
       supabase/server.ts          # Server Supabase client (cookies)
-      koda/generateRecruitingMoves.ts  # Claude API call + mock fallback
-      koda/prompts.ts             # System prompt + user prompt builder
-      koda/agentContext.ts        # Feedback pattern extraction
+      koda/ai/                    # KodaAI provider interface + anthropic + labeled mock
+      koda/generateRecruitingMoves.ts  # Thin wrapper over the provider
+      koda/prompts.ts             # System prompts + prompt builders
+      koda/onboarding.ts          # Server-side onboarding checklist + merge rules
+      koda/briefs.ts              # insertBriefWithMoves (brief + moves + events)
+      koda/agentContext.ts        # Feedback patterns + relationship memory
+      koda/events.ts              # koda_events logging (privacy rules in header)
       koda/email.ts               # Brief email via Resend
       types.ts                    # TypeScript interfaces
       env.ts                      # Environment variable accessors
@@ -44,11 +59,11 @@ with-koda/
     middleware.ts                 # Supabase session refresh
   supabase/
     config.toml                   # Local Supabase config
-    migrations/                   # SQL migration files
-  tests/                          # Playwright test files
+    migrations/                   # SQL migration files (see docs/ARCHITECTURE.md for ordering note)
+  tests/                          # Playwright tests + helpers/
   specs/                          # Test plans
-  scripts/                        # Dev and validation scripts
-  docs/                           # Product, architecture, design, testing docs
+  scripts/                        # Dev, validation, and review scripts
+  docs/                           # Product, architecture, design, testing docs + overnight report
 ```
 
 ## Authoritative Documentation
