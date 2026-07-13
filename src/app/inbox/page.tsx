@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isRecent } from "@/lib/utils";
 import type { Brief, RecruitingMove } from "@/lib/types";
 import { GenerateMovesButton } from "@/components/GenerateMovesButton";
 import { InboxTabs } from "@/components/InboxTabs";
@@ -54,6 +55,9 @@ export default async function InboxPage({
   const briefMoveCount = brief
     ? allMoves.filter((m) => m.brief_id === brief.id).length
     : 0;
+  // "just now" must be true: the ?from=talk param survives bookmarks and
+  // reloads long after the conversation, so gate the banner on brief age.
+  const briefIsFresh = brief !== null && isRecent(brief.created_at);
 
   return (
     <div className="page-enter space-y-6">
@@ -77,7 +81,7 @@ export default async function InboxPage({
         </div>
       </div>
 
-      {from === "talk" && brief && (
+      {from === "talk" && briefIsFresh && (
         <p className="font-system text-primary">
           Built from your conversation just now. Three moves, ready to act on.
         </p>

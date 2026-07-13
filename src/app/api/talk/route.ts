@@ -74,8 +74,16 @@ export async function POST(request: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
       const emit = (event: StreamEvent) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        } catch {
+          // The client disconnected mid-stream. Persistence still completes;
+          // nothing more can be delivered, and enqueue must not crash the turn.
+          closed = true;
+        }
       };
       try {
         if (profileRow) {
@@ -87,7 +95,14 @@ export async function POST(request: Request) {
         console.error("Talk turn failed unexpectedly:", err);
         emit({ type: "error", error: "Koda could not process that. Your message is still here, try again.", retryable: true });
       } finally {
-        controller.close();
+        if (!closed) {
+          closed = true;
+          try {
+            controller.close();
+          } catch {
+            /* already closed by cancellation */
+          }
+        }
       }
     },
   });

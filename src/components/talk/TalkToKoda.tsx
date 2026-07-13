@@ -42,7 +42,7 @@ const STATE_LABELS: Partial<Record<CallStatus, string>> = {
   listening: "Listening",
   processing: "Thinking",
   speaking: "Koda is speaking",
-  network_error: "Connection hiccup, retrying",
+  network_error: "Connection trouble",
   recognition_error: "Could not hear that",
 };
 
@@ -92,6 +92,7 @@ export function TalkToKoda({
   const [missing, setMissing] = useState<string[]>(initialMissing);
   const [done, setDone] = useState(onboarding && initialMissing.length === 0);
   const [aiMode, setAiMode] = useState<string>(initialAiMode);
+  const [announcement, setAnnouncement] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const inFlightRef = useRef(false);
@@ -101,10 +102,16 @@ export function TalkToKoda({
 
   const call = useCallMachine({
     onTurnReady: (text, { lowConfidence }) => {
-      if (lowConfidence) {
-        // Let the user correct what was heard before it goes anywhere.
+      if (lowConfidence || inFlightRef.current) {
+        // Low confidence: let the user correct what was heard before it goes
+        // anywhere. Turn still in flight (they interrupted and kept talking):
+        // never drop their words silently; hand them to the composer.
         setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
-        setInputHint("Check what Koda heard, then send.");
+        setInputHint(
+          inFlightRef.current
+            ? "Koda was still answering. Send this when you are ready."
+            : "Check what Koda heard, then send."
+        );
         inputRef.current?.focus();
         return;
       }
@@ -182,6 +189,7 @@ export function TalkToKoda({
           } else if (event.type === "final") {
             sawFinal = true;
             const reply = typeof event.reply === "string" ? event.reply : streamedReply;
+            setAnnouncement(reply);
             setMessages((prev) =>
               prev.map((m) =>
                 m.streaming
@@ -200,9 +208,9 @@ export function TalkToKoda({
               setMissing((event.missing as string[]) ?? []);
               if (event.done) {
                 setDone(true);
-                // The call ends with the summary; speech drains first.
-                call.finishTurn();
-                call.endCall();
+                // Wind down: the mic stops now, the spoken summary finishes
+                // (finishTurn below drains it), then the call ends on its own.
+                call.windDown();
               }
             }
             if (typeof event.aiMode === "string") setAiMode(event.aiMode);
@@ -253,7 +261,7 @@ export function TalkToKoda({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [done, onboarding, mode, call.beginProcessing, call.speakDelta, call.finishTurn, call.failTurn, call.endCall]
+    [done, onboarding, mode, call.beginProcessing, call.speakDelta, call.finishTurn, call.failTurn, call.windDown]
   );
 
   useEffect(() => {
@@ -303,9 +311,15 @@ export function TalkToKoda({
         </div>
       </header>
 
+      {/* Screen readers hear each completed reply once; a live region on the
+          transcript itself would re-announce every streamed word. */}
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+
       {/* Transcript: the only scrolling region; the page never grows. */}
       <div ref={scrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
-        <div className="mx-auto max-w-2xl px-6 py-8 space-y-6" aria-live="polite">
+        <div className="mx-auto max-w-2xl px-6 py-8 space-y-6">
           {resumed && onboarding && (
             <p className="font-system text-muted-foreground text-center">
               Resumed. Nothing you said was lost.
@@ -387,6 +401,15 @@ export function TalkToKoda({
                 )}
                 {inCall && stateLabel && (
                   <span className="font-system text-primary">{stateLabel}</span>
+                )}
+                {inCall && call.status === "network_error" && (
+                  <button
+                    type="button"
+                    onClick={call.reconnect}
+                    className="font-system text-primary underline underline-offset-2"
+                  >
+                    Reconnect
+                  </button>
                 )}
               </div>
               <div className="flex items-center gap-2">

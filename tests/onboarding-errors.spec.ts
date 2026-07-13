@@ -90,10 +90,14 @@ test("repeated confirm produces exactly one profile, one brief, three moves", as
   }
 
   const confirm = page.getByRole("button", { name: "Confirm and build my first brief" });
-  // Two rapid activations: the client guard and the server-side unique index
-  // must both hold.
-  await confirm.dispatchEvent("click");
-  await confirm.dispatchEvent("click");
+  // Two rapid activations in one evaluation: the client guard and the
+  // server-side unique index must both hold. (Two separate dispatchEvent
+  // calls re-resolve the locator, and the first confirm's navigation can win
+  // that race, timing out on a button that no longer exists.)
+  await confirm.evaluate((el) => {
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
   await expect(page).toHaveURL(/\/inbox/, { timeout: 30000 });
 
   const db = adminClient();

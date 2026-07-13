@@ -114,6 +114,10 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
   const replyDoneRef = useRef(true);
   const sentenceBufferRef = useRef("");
   const networkRetriedRef = useRef(false);
+  // After a barge-in or failure, late-arriving deltas must stay silent.
+  const suppressSpeechRef = useRef(false);
+  // End-of-call wind-down: mic off, queued speech drains, then ended.
+  const windingDownRef = useRef(false);
 
   const setStatusBoth = useCallback((next: CallStatus) => {
     statusRef.current = next;
@@ -138,6 +142,19 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
     const avg = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
     callbacksRef.current.onTurnReady(turn, { lowConfidence: avg < LOW_CONFIDENCE });
   }, [clearPauseTimer]);
+
+  const enterListening = useCallback(() => {
+    setStatusBoth("listening");
+    // Speech that accumulated while Koda was thinking or speaking still forms
+    // a turn. No new recognition result may ever arrive to arm the pause
+    // timer, so arm it here or the words would sit unsubmitted forever.
+    if (pendingRef.current.text) {
+      clearPauseTimer();
+      pauseTimerRef.current = setTimeout(() => {
+        if (statusRef.current === "listening") submitPendingTurn();
+      }, PAUSE_THRESHOLD_MS);
+    }
+  }, [clearPauseTimer, setStatusBoth, submitPendingTurn]);
 
   const cancelSpeech = useCallback(() => {
     sentenceBufferRef.current = "";
@@ -177,6 +194,7 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
       if (statusRef.current === "speaking") {
         const spoken = (pendingRef.current.text + interimText).trim();
         if (spoken.length >= BARGE_IN_MIN_CHARS) {
+          suppressSpeechRef.current = true;
           cancelSpeech();
           replyDoneRef.current = true;
           setStatusBoth("listening");
@@ -215,6 +233,9 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
     };
 
     recognition.onend = () => {
+      // A replaced instance (reconnect started a fresh one) must not touch
+      // shared state or restart itself alongside the new instance.
+      if (recognitionRef.current !== recognition) return;
       setMicActive(false);
       const current = statusRef.current;
       if (!callActiveRef.current || mutedRef.current || current === "permission_denied" || current === "ended") {
@@ -227,6 +248,7 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
       if (current === "network_error") networkRetriedRef.current = true;
       restartTimerRef.current = setTimeout(() => {
         if (!callActiveRef.current || mutedRef.current) return;
+        if (recognitionRef.current !== recognition) return;
         try {
           recognition.start();
           if (statusRef.current === "network_error" || statusRef.current === "recognition_error") {
@@ -249,6 +271,8 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
   const startCall = useCallback(() => {
     if (!supported || callActiveRef.current) return;
     networkRetriedRef.current = false;
+    suppressSpeechRef.current = false;
+    windingDownRef.current = false;
     callActiveRef.current = true;
     setCallActive(true);
     mutedRef.current = false;
@@ -259,6 +283,7 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
 
   const endCall = useCallback(() => {
     callActiveRef.current = false;
+    windingDownRef.current = false;
     setCallActive(false);
     clearPauseTimer();
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
@@ -287,24 +312,32 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
   /** The component submitted a turn; replies may start streaming. */
   const beginProcessing = useCallback(() => {
     clearPauseTimer();
+    suppressSpeechRef.current = false;
     replyDoneRef.current = false;
     sentenceBufferRef.current = "";
     if (callActiveRef.current) setStatusBoth("processing");
   }, [clearPauseTimer, setStatusBoth]);
 
   // After the reply is fully spoken the call returns to listening (the muted
-  // flag overrides what the UI shows and whether the mic actually captures).
+  // flag overrides what the UI shows and whether the mic actually captures),
+  // or ends if a wind-down was requested while speech was still draining.
   const maybeFinishSpeaking = useCallback(() => {
-    if (utteranceCountRef.current === 0 && replyDoneRef.current && callActiveRef.current) {
-      setStatusBoth("listening");
+    if (utteranceCountRef.current !== 0 || !replyDoneRef.current || !callActiveRef.current) return;
+    if (windingDownRef.current) {
+      endCall();
+      return;
     }
-  }, [setStatusBoth]);
+    // Cancelled utterances settle asynchronously; only a turn that is still
+    // in flight may transition to listening (an error state must persist).
+    const current = statusRef.current;
+    if (current === "speaking" || current === "processing") enterListening();
+  }, [endCall, enterListening]);
 
   const speakSentence = useCallback(
     (sentence: string) => {
       const synth = getSpeechSynthesis();
       const text = sentence.trim();
-      if (!synth || !text || !callActiveRef.current) return;
+      if (!synth || !text || !callActiveRef.current || suppressSpeechRef.current) return;
       const utterance = new SpeechSynthesisUtterance(text);
       utteranceCountRef.current += 1;
       utterance.onstart = () => {
@@ -326,7 +359,7 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
   /** Feed streamed reply text; complete sentences are spoken as they form. */
   const speakDelta = useCallback(
     (text: string) => {
-      if (!ttsSupported || !callActiveRef.current) return;
+      if (!ttsSupported || !callActiveRef.current || suppressSpeechRef.current) return;
       sentenceBufferRef.current += text;
       const parts = sentenceBufferRef.current.split(/(?<=[.!?])\s+/);
       while (parts.length > 1) {
@@ -344,14 +377,15 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
       speakSentence(sentenceBufferRef.current);
       sentenceBufferRef.current = "";
     }
-    if (utteranceCountRef.current === 0 && callActiveRef.current) {
-      setStatusBoth("listening");
-    }
-  }, [speakSentence, setStatusBoth]);
+    maybeFinishSpeaking();
+  }, [speakSentence, maybeFinishSpeaking]);
 
-  /** The turn failed after submission; stop any speech and surface the state. */
+  /** The turn failed after submission; stop any speech and surface the state.
+   * Suppression stays on until the next turn so a reply that keeps streaming
+   * past the failure point never becomes audible. */
   const failTurn = useCallback(
     (kind: "ai_error" | "network_error") => {
+      suppressSpeechRef.current = true;
       cancelSpeech();
       replyDoneRef.current = true;
       if (callActiveRef.current) setStatusBoth(kind);
@@ -361,15 +395,44 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
 
   /** Recover from an error state without restarting the call. */
   const resumeListening = useCallback(() => {
-    if (callActiveRef.current && !mutedRef.current) setStatusBoth("listening");
-  }, [setStatusBoth]);
+    if (callActiveRef.current && !mutedRef.current) enterListening();
+  }, [enterListening]);
+
+  /** Manual recovery from a dead recognition session (network errors exhaust
+   * the single automatic retry): start a fresh recognizer. */
+  const reconnect = useCallback(() => {
+    if (!callActiveRef.current || mutedRef.current) return;
+    networkRetriedRef.current = false;
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    recognitionRef.current?.abort();
+    setStatusBoth("connecting");
+    startRecognition();
+  }, [setStatusBoth, startRecognition]);
+
+  /** End the call gently: the mic stops capturing now, any queued reply
+   * speech finishes, and only then does the call end. */
+  const windDown = useCallback(() => {
+    if (!callActiveRef.current) return;
+    windingDownRef.current = true;
+    mutedRef.current = true; // blocks the onend auto-restart
+    recognitionRef.current?.stop();
+    clearPauseTimer();
+    pendingRef.current = { text: "", confidences: [] };
+    setInterim("");
+    setMicActive(false);
+    maybeFinishSpeaking();
+  }, [clearPauseTimer, maybeFinishSpeaking]);
 
   useEffect(() => {
     return () => {
-      recognitionRef.current?.abort();
-      getSpeechSynthesis()?.cancel();
+      // Kill the call flags FIRST: abort() fires an async onend whose restart
+      // path would otherwise reopen the microphone after unmount.
+      callActiveRef.current = false;
+      mutedRef.current = true;
       if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      recognitionRef.current?.abort();
+      getSpeechSynthesis()?.cancel();
     };
   }, []);
 
@@ -383,11 +446,13 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
     micActive,
     startCall,
     endCall,
+    windDown,
     toggleMute,
     beginProcessing,
     speakDelta,
     finishTurn,
     failTurn,
     resumeListening,
+    reconnect,
   };
 }

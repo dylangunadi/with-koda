@@ -52,11 +52,25 @@ async function streamTurn(
   let buffer = "";
   let emitted = 0;
   let sentinelSeen = false;
+  let headChecked = false;
+  let dataOnly = false;
   const HOLDBACK = DATA_SENTINEL.length;
 
   stream.on("text", (text) => {
-    if (sentinelSeen) return;
+    if (sentinelSeen || dataOnly) return;
     buffer += text;
+    if (!headChecked) {
+      const head = buffer.trimStart();
+      if (!head) return;
+      headChecked = true;
+      // A model that regresses to bare JSON (or a fenced block) with no
+      // sentinel must never stream raw braces to the user: hold everything
+      // and recover a reply from the parsed object at the end instead.
+      if (head.startsWith("{") || head.startsWith("`")) {
+        dataOnly = true;
+        return;
+      }
+    }
     const sentinelAt = buffer.indexOf(DATA_SENTINEL);
     if (sentinelAt >= 0) {
       sentinelSeen = true;
@@ -74,6 +88,17 @@ async function streamTurn(
 
   await stream.finalMessage();
   const full = buffer;
+
+  if (dataOnly) {
+    // No reply text ever reached the user; salvage one from the object.
+    const parsed = parseJson(full);
+    const obj = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
+    const salvaged = typeof obj.reply === "string" ? obj.reply.trim() : "";
+    if (!salvaged) throw new KodaAiError("Model returned no reply");
+    onDelta?.(salvaged);
+    return { reply: salvaged, data: obj };
+  }
+
   const sentinelAt = full.indexOf(DATA_SENTINEL);
   const reply = (sentinelAt >= 0 ? full.slice(0, sentinelAt) : full).trim();
   if (!sentinelSeen && reply && emitted < (sentinelAt >= 0 ? sentinelAt : full.length)) {
@@ -92,7 +117,7 @@ async function streamTurn(
       data = {};
     }
   }
-  return { reply: reply.slice(0, 2000), data };
+  return { reply, data };
 }
 
 const VALID_TYPES: MoveType[] = [

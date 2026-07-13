@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { uniqueEmail } from "./helpers/db";
-import { signupViaUi } from "./helpers/auth";
+import { seedOnboardedUser, uniqueEmail } from "./helpers/db";
+import { loginViaUi, signupViaUi } from "./helpers/auth";
 import { installFakeSpeech, removeSpeech } from "./helpers/speech";
 
 declare global {
@@ -132,6 +132,27 @@ test("microphone denial ends the call safely and keeps text fully usable", async
   await page.getByLabel("Message Koda").fill("I'm Riley, a junior at Stanford");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("1 of 9 covered")).toBeVisible({ timeout: 20000 });
+});
+
+test("navigating away mid-call releases the microphone for good", async ({ page }) => {
+  const { user } = await seedOnboardedUser("micunmount");
+  await installFakeSpeech(page);
+  await loginViaUi(page, user.email);
+  await page.goto("/talk");
+
+  await page.getByRole("button", { name: "Start call" }).click();
+  await expect(page.getByText("Mic on")).toBeVisible();
+
+  // Client-side navigation unmounts the call surface without reloading the
+  // page; recognition's async onend must not restart the mic afterwards.
+  await page.getByRole("link", { name: "Back to inbox" }).click();
+  await expect(page).toHaveURL(/\/inbox/);
+
+  const countAfterNav = await page.evaluate(() => window.__speechStartCount);
+  // Give any pending 150ms/1000ms auto-restart timers ample time to fire.
+  await page.waitForTimeout(1500);
+  const countLater = await page.evaluate(() => window.__speechStartCount);
+  expect(countLater).toBe(countAfterNav);
 });
 
 test("user turns appear instantly and Koda's reply streams in", async ({ page }) => {
