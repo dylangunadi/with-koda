@@ -18,6 +18,9 @@ export interface GeneratedMove {
   effort_bucket: EffortBucket;
   expected_outcome: string;
   source_status: MoveSourceStatus;
+  /** Ref id ("EV1", "OP2") of the verified external item this move is built
+   * on; resolved and enforced server-side in grounding.ts. */
+  source_ref: string | null;
 }
 
 export interface OnboardingTurnInput {

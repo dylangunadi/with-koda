@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Brief, RecruitingMove } from "@/lib/types";
-import type { GeneratedMove } from "@/lib/koda/ai/provider";
+import type { GroundedMove } from "@/lib/koda/grounding";
 
 /**
  * Persist a brief and its generated moves as one unit.
@@ -11,7 +11,7 @@ export async function insertBriefWithMoves(
   supabase: SupabaseClient,
   userId: string,
   source: Brief["source"],
-  generated: GeneratedMove[],
+  generated: GroundedMove[],
   metadata: Record<string, unknown> = {}
 ): Promise<{ brief: Brief; moves: RecruitingMove[] }> {
   const { data: brief, error: briefError } = await supabase
@@ -43,6 +43,10 @@ export async function insertBriefWithMoves(
     effort_bucket: move.effort_bucket,
     expected_outcome: move.expected_outcome,
     source_status: move.source_status,
+    external_event_id: move.external_event_id ?? null,
+    external_opportunity_id: move.external_opportunity_id ?? null,
+    source_url: move.source_url ?? null,
+    source_fetched_at: move.source_fetched_at ?? null,
     status: "generated" as const,
   }));
 

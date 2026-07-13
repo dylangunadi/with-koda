@@ -140,7 +140,12 @@ const VALID_TYPES: MoveType[] = [
   "application_strategy",
 ];
 
-const VALID_SOURCE_STATUSES: MoveSourceStatus[] = ["user_provided", "inferred", "ai_suggested"];
+const VALID_SOURCE_STATUSES: MoveSourceStatus[] = [
+  "user_provided",
+  "inferred",
+  "ai_suggested",
+  "verified",
+];
 
 function client(): Anthropic {
   const apiKey = getAnthropicApiKey();
@@ -199,6 +204,9 @@ function sanitizeMove(move: Record<string, unknown>): GeneratedMove {
     source_status: VALID_SOURCE_STATUSES.includes(move.source_status as MoveSourceStatus)
       ? (move.source_status as MoveSourceStatus)
       : "ai_suggested",
+    // Cited ref only; whether it resolves to a real record (and whether
+    // "verified" survives) is decided in grounding.ts, never here.
+    source_ref: move.source_ref ? String(move.source_ref).trim().slice(0, 12) : null,
   };
 }
 

@@ -113,7 +113,7 @@ async function loadCalendarContext(
 
   const nowIso = now.toISOString();
   const upcoming = all
-    .filter((e) => e.start_at && e.start_at >= nowIso)
+    .filter((e) => e.start_at && e.start_at >= nowIso && !handledEventIds.has(e.id))
     .slice(0, UPCOMING_EVENTS_LIMIT);
   const recentPast = all
     .filter((e) => e.start_at && e.start_at < nowIso && !handledEventIds.has(e.id))

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getKodaAI } from "@/lib/koda/ai/provider";
 import { buildAgentContext } from "@/lib/koda/agentContext";
+import { generateRecruitingMoves } from "@/lib/koda/generateRecruitingMoves";
 import { insertBriefWithMoves } from "@/lib/koda/briefs";
 import { logKodaEvent } from "@/lib/koda/events";
 import type { Brief, Profile } from "@/lib/types";
@@ -141,7 +142,9 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
       .single();
     const ai = await getKodaAI();
     const agentContext = await buildAgentContext(supabase, user.id);
-    const generated = await ai.generateMoves(profile as Profile, agentContext);
+    // Through generateRecruitingMoves so verified-source refs are resolved and
+    // enforced; never call the provider directly for persisted moves.
+    const generated = await generateRecruitingMoves(profile as Profile, agentContext);
     const { brief } = await insertBriefWithMoves(supabase, user.id, "onboarding", generated, {
       ai_mode: ai.mode,
     });

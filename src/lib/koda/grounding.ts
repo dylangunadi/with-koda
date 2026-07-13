@@ -1,0 +1,192 @@
+import type {
+  AgentContext,
+  ExternalEvent,
+  ExternalOpportunity,
+  Profile,
+  RecruitingMove,
+} from "@/lib/types";
+import type { GeneratedMove } from "./ai/provider";
+
+/**
+ * Verified grounding refs. The prompt renders external records as [EV1]/[OP1]
+ * items; the model cites a ref; and this module resolves citations back to
+ * real rows. Rendering and resolution share ONE ordering function, so a ref
+ * always means the same record on both sides.
+ *
+ * The "verified" label is unforgeable by construction: a move claiming
+ * verified without a resolvable ref is downgraded to ai_suggested and
+ * stripped of links, no matter what the model said.
+ */
+
+export interface ExternalRef {
+  ref: string;
+  kind: "event" | "opportunity";
+  event?: ExternalEvent;
+  opportunity?: ExternalOpportunity;
+}
+
+export function buildExternalRefs(
+  profile: Profile,
+  agentContext?: AgentContext
+): ExternalRef[] {
+  if (!agentContext) return [];
+  const refs: ExternalRef[] = [];
+
+  const events = [
+    ...(agentContext.calendar?.upcoming ?? []),
+    ...(agentContext.calendar?.recent_past ?? []),
+  ];
+  events.forEach((event, i) => {
+    refs.push({ ref: `EV${i + 1}`, kind: "event", event });
+  });
+
+  // Target-company matches first, then newest (query already orders by
+  // last_seen_at descending).
+  const targets = (profile.target_companies ?? []).map((c) => c.trim().toLowerCase());
+  const isTarget = (o: ExternalOpportunity) =>
+    targets.includes(o.company.trim().toLowerCase()) ? 0 : 1;
+  const opportunities = [...(agentContext.opportunities ?? [])].sort(
+    (a, b) => isTarget(a) - isTarget(b)
+  );
+  opportunities.forEach((opportunity, i) => {
+    refs.push({ ref: `OP${i + 1}`, kind: "opportunity", opportunity });
+  });
+
+  return refs;
+}
+
+export type GroundedMove = GeneratedMove & {
+  external_event_id: string | null;
+  external_opportunity_id: string | null;
+  source_url: string | null;
+  source_fetched_at: string | null;
+};
+
+/**
+ * Resolve model-cited refs against the actual context. Valid ref: link the
+ * move to the real record and copy source URL + fetch time onto it. Invalid
+ * or missing ref while claiming verified: downgrade. As a final dedup belt,
+ * drop moves grounded in an event that already has a non-rejected move.
+ */
+export function resolveSourceRefs(
+  moves: GeneratedMove[],
+  profile: Profile,
+  agentContext?: AgentContext
+): GroundedMove[] {
+  const refs = new Map(buildExternalRefs(profile, agentContext).map((r) => [r.ref, r]));
+  const handledEventIds = new Set(
+    (agentContext?.prior_moves ?? [])
+      .filter((m: RecruitingMove) => m.external_event_id && m.status !== "rejected")
+      .map((m) => m.external_event_id as string)
+  );
+
+  const resolved: GroundedMove[] = [];
+  for (const move of moves) {
+    const refId = (move.source_ref ?? "").trim().toUpperCase();
+    const ref = refId ? refs.get(refId) : undefined;
+
+    if (ref?.kind === "event" && ref.event) {
+      if (handledEventIds.has(ref.event.id)) continue; // duplicate belt
+      resolved.push({
+        ...move,
+        source_ref: refId,
+        source_status: "verified",
+        external_event_id: ref.event.id,
+        external_opportunity_id: null,
+        source_url: ref.event.html_link,
+        source_fetched_at: ref.event.fetched_at,
+      });
+      continue;
+    }
+    if (ref?.kind === "opportunity" && ref.opportunity) {
+      resolved.push({
+        ...move,
+        source_ref: refId,
+        source_status: "verified",
+        external_event_id: null,
+        external_opportunity_id: ref.opportunity.id,
+        source_url: ref.opportunity.absolute_url,
+        source_fetched_at: ref.opportunity.fetched_at,
+      });
+      continue;
+    }
+
+    resolved.push({
+      ...move,
+      source_ref: null,
+      // Unforgeable label: verified without a resolvable ref is a downgrade.
+      source_status: move.source_status === "verified" ? "ai_suggested" : move.source_status,
+      external_event_id: null,
+      external_opportunity_id: null,
+      source_url: null,
+      source_fetched_at: null,
+    });
+  }
+  return resolved;
+}
+
+function formatEventTime(event: ExternalEvent): string {
+  if (!event.start_at) return "time unknown";
+  const d = new Date(event.start_at);
+  return d.toUTCString().replace(/:\d\d GMT$/, " UTC");
+}
+
+const TITLE_MAX = 120;
+const SNIPPET_MAX = 300;
+
+/** Render the VERIFIED CALENDAR / VERIFIED OPENINGS prompt blocks. */
+export function renderExternalBlocks(refs: ExternalRef[], now = new Date()): string[] {
+  const parts: string[] = [];
+  const eventRefs = refs.filter((r) => r.kind === "event" && r.event);
+  const oppRefs = refs.filter((r) => r.kind === "opportunity" && r.opportunity);
+
+  if (eventRefs.length > 0) {
+    parts.push(
+      "\nVERIFIED CALENDAR (from the student's connected calendar — real events, real attendee names you MAY use):"
+    );
+    for (const { ref, event } of eventRefs) {
+      if (!event) continue;
+      const upcoming = event.start_at ? event.start_at >= now.toISOString() : false;
+      const bits = [
+        `[${ref}]`,
+        formatEventTime(event),
+        `"${(event.title ?? "untitled").slice(0, TITLE_MAX)}"`,
+      ];
+      const people = event.attendees
+        .filter((a) => a.name || a.email)
+        .slice(0, 3)
+        .map((a) => (a.name ? `${a.name}${a.email ? ` (${a.email})` : ""}` : a.email))
+        .join(", ");
+      if (people) bits.push(`with ${people}`);
+      if (event.classification) bits.push(`[${event.classification}]`);
+      bits.push(upcoming ? "[needs prep]" : "[needs follow-up]");
+      if (event.description_snippet) {
+        bits.push(`— ${event.description_snippet.slice(0, SNIPPET_MAX)}`);
+      }
+      parts.push(`- ${bits.join(" ")}`);
+    }
+  }
+
+  if (oppRefs.length > 0) {
+    parts.push(
+      "\nVERIFIED OPENINGS (live on official job boards; every one has a real URL — never invent openings beyond these):"
+    );
+    for (const { ref, opportunity } of oppRefs) {
+      if (!opportunity) continue;
+      const bits = [
+        `[${ref}]`,
+        opportunity.company,
+        "—",
+        opportunity.title.slice(0, TITLE_MAX),
+      ];
+      if (opportunity.location) bits.push(`(${opportunity.location})`);
+      if (opportunity.source_posted_at) {
+        bits.push(`— posted ${opportunity.source_posted_at.slice(0, 10)}`);
+      }
+      bits.push(`— ${opportunity.absolute_url}`);
+      parts.push(`- ${bits.join(" ")}`);
+    }
+  }
+
+  return parts;
+}

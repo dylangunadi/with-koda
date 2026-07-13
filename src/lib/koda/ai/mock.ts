@@ -302,6 +302,7 @@ async function computeOngoingTurn(input: OngoingTurnInput): Promise<OngoingTurnR
 }
 
 async function generateMoves(profile: Profile, agentContext?: AgentContext): Promise<GeneratedMove[]> {
+  const { buildExternalRefs } = await import("@/lib/koda/grounding");
   const role = pick(profile.target_roles) ?? "your target role";
   const company = pick(profile.target_companies) ?? "one of your target companies";
   const secondCompany = pick(profile.target_companies, 1);
@@ -317,6 +318,85 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
   );
 
   const moves: GeneratedMove[] = [];
+
+  // 0. Verified external context first: a real calendar event (prep or
+  //    follow-up) and a real live posting, each citing its ref exactly like
+  //    the live provider is instructed to. This is what makes the grounded
+  //    loop browser-testable offline.
+  const externalRefs = buildExternalRefs(profile, agentContext);
+  const eventRef = externalRefs.find((r) => r.kind === "event" && r.event);
+  const oppRef = externalRefs.find((r) => r.kind === "opportunity" && r.opportunity);
+
+  if (eventRef?.event) {
+    const event = eventRef.event;
+    const upcoming = event.start_at ? event.start_at >= new Date().toISOString() : false;
+    const who = event.attendees.find((a) => a.name)?.name ?? "the person you met";
+    const eventTitle = event.title ?? "your meeting";
+    moves.push(
+      upcoming
+        ? {
+            title: `Prep for "${eventTitle}"`,
+            type: "follow_up",
+            company: null,
+            person: who,
+            fit_reason: `This is on your calendar. Walking in with two sharp questions and one story about your own work turns a pleasant chat into a real step forward.`,
+            suggested_action: `Spend 20 minutes on ${who}'s team and recent work, then write down two questions only they can answer.`,
+            outreach_draft: "",
+            proof_of_work_idea: "",
+            follow_up_timing: "Before the event starts.",
+            source_note: `${MOCK_NOTE} Built from an event on your connected calendar.`,
+            confidence: 0.9,
+            priority: "now",
+            effort: "20-30 min",
+            effort_bucket: "focused",
+            expected_outcome: "You show up prepared and memorable instead of generic.",
+            source_status: "verified",
+            source_ref: eventRef.ref,
+          }
+        : {
+            title: `Send a follow-up for "${eventTitle}"`,
+            type: "follow_up",
+            company: null,
+            person: who,
+            fit_reason: `You had this conversation recently. A same-week thank-you with one specific detail keeps the door open; silence closes it.`,
+            suggested_action: `Send ${who} a short note today referencing one thing you discussed.`,
+            outreach_draft: `Hi ${who}, thank you again for the time. What you said stuck with me, and I have already started acting on it. I would love to keep you posted, and if it ever makes sense to point me toward the right next person or step, I would be grateful.`,
+            proof_of_work_idea: "",
+            follow_up_timing: "Today or tomorrow; the window closes fast.",
+            source_note: `${MOCK_NOTE} Built from an event on your connected calendar.`,
+            confidence: 0.9,
+            priority: "now",
+            effort: "10-15 min",
+            effort_bucket: "quick",
+            expected_outcome: "The relationship stays warm while the conversation is fresh.",
+            source_status: "verified",
+            source_ref: eventRef.ref,
+          }
+    );
+  }
+
+  if (oppRef?.opportunity) {
+    const opp = oppRef.opportunity;
+    moves.push({
+      title: `Apply to ${opp.title} at ${opp.company}`,
+      type: "opportunity",
+      company: opp.company,
+      person: null,
+      fit_reason: `This role is live on ${opp.company}'s official board right now and matches the targets you named. Verified roles beat speculative ones: the posting is real and linked.`,
+      suggested_action: `Read the posting, then draft your application materials for it this week.`,
+      outreach_draft: "",
+      proof_of_work_idea: "",
+      follow_up_timing: "Apply within the week; postings close without warning.",
+      source_note: `${MOCK_NOTE} Role found on the company's official job board.`,
+      confidence: 0.85,
+      priority: "this_week",
+      effort: "1-2 hours",
+      effort_bucket: "project",
+      expected_outcome: "A real application in flight at a company you actually named.",
+      source_status: "verified",
+      source_ref: oppRef.ref,
+    });
+  }
 
   // 1. Relationship move: grounded in the user's own stated contacts when they
   //    exist, otherwise an explicitly archetypal outreach at a stated target.
@@ -338,6 +418,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       effort_bucket: "focused",
       expected_outcome: "One warm conversation scheduled with someone you already know.",
       source_status: "user_provided",
+      source_ref: null,
     });
   } else {
     moves.push({
@@ -357,6 +438,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       effort_bucket: "focused",
       expected_outcome: "One real conversation started at a stated target company.",
       source_status: "ai_suggested",
+      source_ref: null,
     });
   }
 
@@ -384,6 +466,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
     effort_bucket: "project",
     expected_outcome: "A linkable artifact that upgrades every application and message you send.",
     source_status: proof ? "inferred" : "ai_suggested",
+    source_ref: null,
   });
 
   // 3. Strategy move grounded in stated stage and timeline.
@@ -404,14 +487,16 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
     effort_bucket: "focused",
     expected_outcome: "A two-week plan matched to your stated deadline, so effort lands where you said it matters.",
     source_status: "inferred",
+    source_ref: null,
   });
 
-  // Never repeat a title the user already has (cheap dedupe for regeneration).
-  return moves.map((m) =>
-    avoidTitles.has(m.title.toLowerCase())
-      ? { ...m, title: `${m.title} (next step)` }
-      : m
-  );
+  // Never repeat a title the user already has (cheap dedupe for regeneration),
+  // and always exactly 3 moves: verified-grounded ones take the front slots.
+  return moves
+    .map((m) =>
+      avoidTitles.has(m.title.toLowerCase()) ? { ...m, title: `${m.title} (next step)` } : m
+    )
+    .slice(0, 3);
 }
 
 export const mockProvider: KodaAI = {

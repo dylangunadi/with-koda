@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isRecent } from "@/lib/utils";
 import type { Brief, RecruitingMove } from "@/lib/types";
+import { ConnectPrompt } from "@/components/ConnectPrompt";
 import { GenerateMovesButton } from "@/components/GenerateMovesButton";
 import { InboxTabs } from "@/components/InboxTabs";
 import { BriefHeader } from "@/components/BriefHeader";
@@ -28,13 +29,25 @@ export default async function InboxPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, recruiting_stage, integrations_prompt_dismissed_at")
     .eq("user_id", user.id)
     .single();
 
   if (!profile) {
     redirect("/talk");
   }
+
+  // Recommend the calendar integration only after the first brief exists,
+  // only while unconnected, and never again once dismissed.
+  const { data: calendarIntegration } = await supabase
+    .from("integrations")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("provider", "google_calendar")
+    .maybeSingle();
+
+  const showConnectPrompt =
+    !calendarIntegration && !profile.integrations_prompt_dismissed_at;
 
   const { data: moves } = await supabase
     .from("recruiting_moves")
@@ -85,6 +98,10 @@ export default async function InboxPage({
         <p className="font-system text-primary">
           Built from your conversation just now. Three moves, ready to act on.
         </p>
+      )}
+
+      {showConnectPrompt && brief && (
+        <ConnectPrompt recruitingStage={profile.recruiting_stage ?? null} />
       )}
 
       {brief && briefMoveCount > 0 && (
