@@ -1,9 +1,20 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { WaitlistForm } from "@/components/WaitlistForm";
 import { AgentStatus } from "@/components/AgentStatus";
 
-export default function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  // Auth emails configured with a bare site URL land here with ?code=...;
+  // hand the code to the real callback so the click still signs the user in.
+  const { code } = await searchParams;
+  if (code) {
+    redirect(`/auth/callback?code=${encodeURIComponent(code)}`);
+  }
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Grain overlay */}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -17,6 +17,18 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirmationSent, setConfirmationSent] = useState(false)
+
+  useEffect(() => {
+    async function readAuthError() {
+      const authError = new URLSearchParams(window.location.search).get("error")
+      if (authError === "confirm") {
+        setError(
+          "That confirmation link is invalid or expired, or was opened in a different browser. Sign in, or sign up again for a fresh link."
+        )
+      }
+    }
+    readAuthError()
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -51,6 +63,11 @@ export default function LoginPage() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          // Confirmation links come back to this exact deployment (localhost,
+          // preview, or production) instead of the auth server's default URL.
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       })
       if (error) {
         setError(error.message)
@@ -120,7 +137,7 @@ export default function LoginPage() {
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
-                Click it to activate your account, then come back and sign in.
+                Click it and you will be signed in automatically.
               </p>
               <button
                 type="button"
