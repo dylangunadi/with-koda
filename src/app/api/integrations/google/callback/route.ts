@@ -27,9 +27,11 @@ function settingsRedirect(origin: string, result: string): NextResponse {
   const response = NextResponse.redirect(
     new URL(`/settings/integrations?connect=${result}`, origin)
   );
-  // One-shot cookies: always cleared, success or failure.
-  response.cookies.delete("koda_oauth_state");
-  response.cookies.delete("koda_oauth_verifier");
+  // One-shot cookies: always cleared, success or failure. The path must
+  // match the one they were set with or the delete is a browser no-op.
+  const path = "/api/integrations/google";
+  response.cookies.delete({ name: "koda_oauth_state", path });
+  response.cookies.delete({ name: "koda_oauth_verifier", path });
   return response;
 }
 

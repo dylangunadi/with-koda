@@ -109,8 +109,8 @@ export function IntegrationCard({
               )}
               {needsReconnect && (
                 <p className="mt-1 text-sm text-amber-700 dark:text-amber-500">
-                  Google needs you to sign in again to keep syncing. Your data is
-                  untouched — reconnect to resume.
+                  Google needs you to sign in again to keep syncing. Your data
+                  is untouched, and reconnecting resumes where it left off.
                 </p>
               )}
             </div>

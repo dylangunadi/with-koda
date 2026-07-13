@@ -302,7 +302,7 @@ async function computeOngoingTurn(input: OngoingTurnInput): Promise<OngoingTurnR
 }
 
 async function generateMoves(profile: Profile, agentContext?: AgentContext): Promise<GeneratedMove[]> {
-  const { buildExternalRefs } = await import("@/lib/koda/grounding");
+  const { buildExternalRefs, isEventUpcoming } = await import("@/lib/koda/grounding");
   const role = pick(profile.target_roles) ?? "your target role";
   const company = pick(profile.target_companies) ?? "one of your target companies";
   const secondCompany = pick(profile.target_companies, 1);
@@ -329,7 +329,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
 
   if (eventRef?.event) {
     const event = eventRef.event;
-    const upcoming = event.start_at ? event.start_at >= new Date().toISOString() : false;
+    const upcoming = isEventUpcoming(event);
     const who = event.attendees.find((a) => a.name)?.name ?? "the person you met";
     const eventTitle = event.title ?? "your meeting";
     moves.push(

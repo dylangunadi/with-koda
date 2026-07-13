@@ -62,6 +62,14 @@ export type GroundedMove = GeneratedMove & {
   source_fetched_at: string | null;
 };
 
+/** An event still needs prep until it has ended; all-day events stay
+ * "upcoming" for their whole day. Parsed times, never lexical string
+ * comparison (offset formats and date-only strings don't compare reliably). */
+export function isEventUpcoming(event: ExternalEvent, now = new Date()): boolean {
+  const endMs = Date.parse(event.end_at ?? event.start_at ?? "");
+  return !Number.isNaN(endMs) && endMs >= now.getTime();
+}
+
 /**
  * Resolve model-cited refs against the actual context. Valid ref: link the
  * move to the real record and copy source URL + fetch time onto it. Invalid
@@ -74,16 +82,26 @@ export function resolveSourceRefs(
   agentContext?: AgentContext
 ): GroundedMove[] {
   const refs = new Map(buildExternalRefs(profile, agentContext).map((r) => [r.ref, r]));
+  const priorMoves = agentContext?.prior_moves ?? [];
   const handledEventIds = new Set(
-    (agentContext?.prior_moves ?? [])
+    priorMoves
       .filter((m: RecruitingMove) => m.external_event_id && m.status !== "rejected")
       .map((m) => m.external_event_id as string)
   );
+  const handledOppIds = new Set(
+    priorMoves
+      .filter((m: RecruitingMove) => m.external_opportunity_id && m.status !== "rejected")
+      .map((m) => m.external_opportunity_id as string)
+  );
+  // Within-batch belt: if the model cites the same ref twice in one
+  // generation, only the first move keeps it.
+  const consumedRefs = new Set<string>();
 
   const resolved: GroundedMove[] = [];
   for (const move of moves) {
     const refId = (move.source_ref ?? "").trim().toUpperCase();
-    const ref = refId ? refs.get(refId) : undefined;
+    const ref = refId && !consumedRefs.has(refId) ? refs.get(refId) : undefined;
+    if (ref) consumedRefs.add(refId);
 
     if (ref?.kind === "event" && ref.event) {
       if (handledEventIds.has(ref.event.id)) continue; // duplicate belt
@@ -99,6 +117,7 @@ export function resolveSourceRefs(
       continue;
     }
     if (ref?.kind === "opportunity" && ref.opportunity) {
+      if (handledOppIds.has(ref.opportunity.id)) continue; // duplicate belt
       resolved.push({
         ...move,
         source_ref: refId,
@@ -125,6 +144,18 @@ export function resolveSourceRefs(
   return resolved;
 }
 
+/** Last-line belt at the persistence boundary: a move cannot be written as
+ * "verified" unless it actually links to an external record. Callers that
+ * route through resolveSourceRefs never trip this; it exists so a future
+ * code path that skips the resolver cannot forge the label. */
+export function enforceVerifiedIntegrity<T extends GroundedMove>(move: T): T {
+  const linked = move.external_event_id || move.external_opportunity_id;
+  if (move.source_status === "verified" && !linked) {
+    return { ...move, source_status: "ai_suggested", source_url: null, source_fetched_at: null };
+  }
+  return move;
+}
+
 function formatEventTime(event: ExternalEvent): string {
   if (!event.start_at) return "time unknown";
   const d = new Date(event.start_at);
@@ -146,7 +177,7 @@ export function renderExternalBlocks(refs: ExternalRef[], now = new Date()): str
     );
     for (const { ref, event } of eventRefs) {
       if (!event) continue;
-      const upcoming = event.start_at ? event.start_at >= now.toISOString() : false;
+      const upcoming = isEventUpcoming(event, now);
       const bits = [
         `[${ref}]`,
         formatEventTime(event),

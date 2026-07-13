@@ -32,7 +32,8 @@ export function ConnectPrompt({ recruitingStage }: { recruitingStage: string | n
         .from("profiles")
         .update({ integrations_prompt_dismissed_at: new Date().toISOString() })
         .eq("user_id", user.id);
-      supabase.from("koda_events").insert({
+      // Supabase builders are lazy: without await the request never fires.
+      await supabase.from("koda_events").insert({
         user_id: user.id,
         event_name: "integrations_prompt_dismissed",
         properties: {},

@@ -131,44 +131,49 @@ export async function runCalendarSync(
     const relationships = (relationshipRows ?? []) as Relationship[];
 
     const fetchedAt = new Date().toISOString();
-    let upserted = 0;
-    for (const event of result.events) {
-      const row = {
-        user_id: integration.user_id,
-        integration_id: integration.id,
-        provider: "google_calendar",
-        external_id: event.external_id,
-        title: event.title,
-        description_snippet: event.description_snippet,
-        start_at: event.start_at,
-        end_at: event.end_at,
-        location: event.location,
-        attendees: event.attendees,
-        organizer_email: event.organizer_email,
-        html_link: event.html_link,
-        event_status: event.event_status,
-        classification: classifyEvent(event),
-        relationship_id: matchRelationship(event, relationships),
-        source_updated_at: event.source_updated_at,
-        fetched_at: fetchedAt,
-        updated_at: fetchedAt,
-      };
+    const rows = result.events.map((event) => ({
+      user_id: integration.user_id,
+      integration_id: integration.id,
+      provider: "google_calendar",
+      external_id: event.external_id,
+      title: event.title,
+      description_snippet: event.description_snippet,
+      start_at: event.start_at,
+      end_at: event.end_at,
+      location: event.location,
+      attendees: event.attendees,
+      organizer_email: event.organizer_email,
+      html_link: event.html_link,
+      event_status: event.event_status,
+      classification: classifyEvent(event),
+      relationship_id: matchRelationship(event, relationships),
+      source_updated_at: event.source_updated_at,
+      fetched_at: fetchedAt,
+      updated_at: fetchedAt,
+    }));
+    if (rows.length > 0) {
       const { error } = await service
         .from("external_events")
-        .upsert(row, { onConflict: "user_id,provider,external_id" });
+        .upsert(rows, { onConflict: "user_id,provider,external_id" });
       if (error) {
         throw new Error(`Event upsert failed: ${error.message}`);
       }
-      upserted += 1;
     }
 
     const stats = {
       fetched: result.events.length,
-      upserted,
+      upserted: rows.length,
       full_resync: result.fullResync ? 1 : 0,
     };
     await finishRun(service, claim.runId, { status: "ok", stats });
-    await recordSyncSuccess(service, integration.id, result.nextCursor);
+    // Cursor semantics: a fresh token replaces the old one; a full resync
+    // that yielded no token clears it; an incremental pull that yielded no
+    // token (page-cap truncation) keeps the existing cursor untouched.
+    await recordSyncSuccess(
+      service,
+      integration.id,
+      result.nextCursor ?? (result.fullResync ? null : undefined)
+    );
     return { ok: true, stats };
   } catch (err) {
     const reconnectRequired = err instanceof ReconnectRequiredError;
@@ -211,57 +216,62 @@ export async function runJobBoardsSync(
       });
       fetched += postings.length;
 
-      const liveIds: string[] = [];
-      for (const posting of postings) {
-        liveIds.push(posting.external_id);
-        const { error } = await service.from("external_opportunities").upsert(
-          {
-            user_id: integration.user_id,
-            integration_id: integration.id,
-            provider: board.ats,
-            board_token: board.board_token,
-            external_id: posting.external_id,
-            company: posting.company,
-            title: posting.title,
-            location: posting.location,
-            department: posting.department,
-            absolute_url: posting.absolute_url,
-            source_posted_at: posting.source_posted_at,
-            source_updated_at: posting.source_updated_at,
-            last_seen_at: fetchedAt,
-            fetched_at: fetchedAt,
-            verification_status: "verified_live",
-            updated_at: fetchedAt,
-          },
-          { onConflict: "user_id,provider,board_token,external_id" }
-        );
+      const rows = postings.map((posting) => ({
+        user_id: integration.user_id,
+        integration_id: integration.id,
+        provider: board.ats,
+        board_token: board.board_token,
+        external_id: posting.external_id,
+        company: posting.company,
+        title: posting.title,
+        location: posting.location,
+        department: posting.department,
+        absolute_url: posting.absolute_url,
+        source_posted_at: posting.source_posted_at,
+        source_updated_at: posting.source_updated_at,
+        last_seen_at: fetchedAt,
+        fetched_at: fetchedAt,
+        verification_status: "verified_live",
+        updated_at: fetchedAt,
+      }));
+      if (rows.length > 0) {
+        const { error } = await service
+          .from("external_opportunities")
+          .upsert(rows, { onConflict: "user_id,provider,board_token,external_id" });
         if (error) {
           throw new Error(`Opportunity upsert failed: ${error.message}`);
         }
-        upserted += 1;
       }
+      upserted += rows.length;
 
       // Postings that were live on this board but absent from this fetch are
       // no longer listed: mark closed (honest label, no silent deletion).
-      let closeQuery = service
+      // The complement is computed in JS on our own row ids — external ids
+      // from the ATS are never interpolated into a filter string.
+      const liveIdSet = new Set(postings.map((p) => p.external_id));
+      const { data: liveRows, error: liveError } = await service
         .from("external_opportunities")
-        .update({ verification_status: "closed", updated_at: fetchedAt }, { count: "exact" })
+        .select("id, external_id")
         .eq("user_id", integration.user_id)
         .eq("provider", board.ats)
         .eq("board_token", board.board_token)
         .eq("verification_status", "verified_live");
-      if (liveIds.length > 0) {
-        closeQuery = closeQuery.not(
-          "external_id",
-          "in",
-          `(${liveIds.map((id) => `"${id}"`).join(",")})`
-        );
+      if (liveError) {
+        throw new Error(`Opportunity close pass failed: ${liveError.message}`);
       }
-      const { count, error: closeError } = await closeQuery;
-      if (closeError) {
-        throw new Error(`Opportunity close pass failed: ${closeError.message}`);
+      const staleRowIds = (liveRows ?? [])
+        .filter((r) => !liveIdSet.has(r.external_id))
+        .map((r) => r.id);
+      if (staleRowIds.length > 0) {
+        const { error: closeError } = await service
+          .from("external_opportunities")
+          .update({ verification_status: "closed", updated_at: fetchedAt })
+          .in("id", staleRowIds);
+        if (closeError) {
+          throw new Error(`Opportunity close pass failed: ${closeError.message}`);
+        }
       }
-      closed += count ?? 0;
+      closed += staleRowIds.length;
     }
 
     const stats = { boards: boards.length, fetched, upserted, closed };

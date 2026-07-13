@@ -64,7 +64,7 @@ export async function buildAgentContext(
 
   const [calendar, opportunities] = await Promise.all([
     loadCalendarContext(supabase, userId, priorMoves),
-    loadOpportunities(supabase, userId),
+    loadOpportunities(supabase, userId, priorMoves),
   ]);
 
   return {
@@ -91,6 +91,8 @@ async function loadCalendarContext(
   const windowEnd = new Date(now.getTime() + UPCOMING_WINDOW_DAYS * 86_400_000);
   const windowStart = new Date(now.getTime() - RECENT_PAST_WINDOW_DAYS * 86_400_000);
 
+  // Descending order so a dense past week can never starve upcoming events
+  // out of the fetch window; partitioning happens below on parsed times.
   const { data: eventRows } = await supabase
     .from("external_events")
     .select("*")
@@ -98,8 +100,8 @@ async function loadCalendarContext(
     .eq("event_status", "confirmed")
     .gte("start_at", windowStart.toISOString())
     .lte("start_at", windowEnd.toISOString())
-    .order("start_at", { ascending: true })
-    .limit(UPCOMING_EVENTS_LIMIT + RECENT_PAST_EVENTS_LIMIT + 8);
+    .order("start_at", { ascending: false })
+    .limit(60);
 
   const all = (eventRows ?? []) as ExternalEvent[];
 
@@ -111,22 +113,35 @@ async function loadCalendarContext(
       .map((m) => m.external_event_id as string)
   );
 
-  const nowIso = now.toISOString();
-  const upcoming = all
-    .filter((e) => e.start_at && e.start_at >= nowIso && !handledEventIds.has(e.id))
+  // Parsed-time comparison (never lexical: Postgres offset formats and
+  // all-day date strings do not compare reliably as strings). An event still
+  // needs prep until it has ended, which also keeps all-day events "upcoming"
+  // for their whole day.
+  const nowMs = now.getTime();
+  const endMs = (e: ExternalEvent) => Date.parse(e.end_at ?? e.start_at ?? "");
+  const candidates = all.filter(
+    (e) => e.start_at && !Number.isNaN(endMs(e)) && !handledEventIds.has(e.id)
+  );
+  const upcoming = candidates
+    .filter((e) => endMs(e) >= nowMs)
+    .sort((a, b) => endMs(a) - endMs(b))
     .slice(0, UPCOMING_EVENTS_LIMIT);
-  const recentPast = all
-    .filter((e) => e.start_at && e.start_at < nowIso && !handledEventIds.has(e.id))
-    .slice(-RECENT_PAST_EVENTS_LIMIT);
+  const recentPast = candidates
+    .filter((e) => endMs(e) < nowMs)
+    .sort((a, b) => endMs(b) - endMs(a))
+    .slice(0, RECENT_PAST_EVENTS_LIMIT);
 
   return { upcoming, recent_past: recentPast };
 }
 
-/** Live verified opportunities, newest first. (Target-company prioritization
- * happens at prompt serialization, where the profile is in hand.) */
+/** Live verified opportunities, newest first, excluding ones that already
+ * produced a non-rejected move (same dedup rule as calendar events).
+ * Target-company prioritization happens at prompt serialization, where the
+ * profile is in hand. */
 async function loadOpportunities(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  priorMoves: RecruitingMove[]
 ): Promise<ExternalOpportunity[]> {
   const { data: rows } = await supabase
     .from("external_opportunities")
@@ -134,9 +149,17 @@ async function loadOpportunities(
     .eq("user_id", userId)
     .eq("verification_status", "verified_live")
     .order("last_seen_at", { ascending: false })
-    .limit(OPPORTUNITIES_LIMIT);
+    .limit(OPPORTUNITIES_LIMIT * 2);
 
-  return (rows ?? []) as ExternalOpportunity[];
+  const handledOppIds = new Set(
+    priorMoves
+      .filter((m) => m.external_opportunity_id && m.status !== "rejected")
+      .map((m) => m.external_opportunity_id as string)
+  );
+
+  return ((rows ?? []) as ExternalOpportunity[])
+    .filter((o) => !handledOppIds.has(o.id))
+    .slice(0, OPPORTUNITIES_LIMIT);
 }
 
 function extractFeedbackPatterns(

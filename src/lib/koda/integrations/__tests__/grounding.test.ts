@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildExternalRefs, renderExternalBlocks, resolveSourceRefs } from "@/lib/koda/grounding";
+import {
+  buildExternalRefs,
+  enforceVerifiedIntegrity,
+  isEventUpcoming,
+  renderExternalBlocks,
+  resolveSourceRefs,
+} from "@/lib/koda/grounding";
 import type { GeneratedMove } from "@/lib/koda/ai/provider";
 import type {
   AgentContext,
@@ -239,6 +245,36 @@ describe("resolveSourceRefs", () => {
     expect(results).toHaveLength(0);
   });
 
+  it("drops a move for an opportunity that already has a non-rejected move", () => {
+    const ctxWithHandled = makeContext({
+      opportunities: [makeOpp()],
+      prior_moves: [
+        { external_opportunity_id: "op-row-1", status: "completed" } as RecruitingMove,
+      ],
+    });
+    const results = resolveSourceRefs(
+      [makeMove({ source_ref: "OP1", source_status: "verified", type: "opportunity" })],
+      makeProfile(),
+      ctxWithHandled
+    );
+    expect(results).toHaveLength(0);
+  });
+
+  it("only the first move keeps a ref cited twice in one batch", () => {
+    const results = resolveSourceRefs(
+      [
+        makeMove({ title: "first", source_ref: "EV1", source_status: "verified" }),
+        makeMove({ title: "second", source_ref: "EV1", source_status: "verified" }),
+      ],
+      makeProfile(),
+      ctx
+    );
+    expect(results).toHaveLength(2);
+    expect(results[0].external_event_id).toBe("ev-row-1");
+    expect(results[1].external_event_id).toBeNull();
+    expect(results[1].source_status).toBe("ai_suggested");
+  });
+
   it("does not drop when the prior move was rejected", () => {
     const ctxRejected = makeContext({
       calendar: { upcoming: [makeEvent()], recent_past: [] },
@@ -252,6 +288,54 @@ describe("resolveSourceRefs", () => {
       ctxRejected
     );
     expect(results).toHaveLength(1);
+  });
+});
+
+describe("isEventUpcoming", () => {
+  it("keeps an in-progress or all-day event upcoming until it ends", () => {
+    const now = new Date("2026-07-13T14:00:00Z");
+    const allDayToday = makeEvent({ start_at: "2026-07-13", end_at: "2026-07-14" });
+    expect(isEventUpcoming(allDayToday, now)).toBe(true);
+    const inProgress = makeEvent({
+      start_at: "2026-07-13T13:30:00+00:00",
+      end_at: "2026-07-13T14:30:00+00:00",
+    });
+    expect(isEventUpcoming(inProgress, now)).toBe(true);
+    const ended = makeEvent({
+      start_at: "2026-07-13T10:00:00+00:00",
+      end_at: "2026-07-13T10:30:00+00:00",
+    });
+    expect(isEventUpcoming(ended, now)).toBe(false);
+  });
+
+  it("is false for unparseable times", () => {
+    expect(isEventUpcoming(makeEvent({ start_at: null, end_at: null }))).toBe(false);
+  });
+});
+
+describe("enforceVerifiedIntegrity", () => {
+  it("downgrades a verified move with no external link", () => {
+    const forged = {
+      ...makeMove({ source_status: "verified" }),
+      external_event_id: null,
+      external_opportunity_id: null,
+      source_url: "https://evil.example.com",
+      source_fetched_at: "2026-07-13T00:00:00Z",
+    };
+    const result = enforceVerifiedIntegrity(forged);
+    expect(result.source_status).toBe("ai_suggested");
+    expect(result.source_url).toBeNull();
+  });
+
+  it("passes a properly linked verified move through unchanged", () => {
+    const linked = {
+      ...makeMove({ source_status: "verified" }),
+      external_event_id: "ev-row-1",
+      external_opportunity_id: null,
+      source_url: "https://calendar.google.com/e/1",
+      source_fetched_at: "2026-07-13T00:00:00Z",
+    };
+    expect(enforceVerifiedIntegrity(linked)).toEqual(linked);
   });
 });
 

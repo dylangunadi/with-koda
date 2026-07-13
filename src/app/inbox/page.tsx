@@ -38,30 +38,34 @@ export default async function InboxPage({
   }
 
   // Recommend the calendar integration only after the first brief exists,
-  // only while unconnected, and never again once dismissed.
-  const { data: calendarIntegration } = await supabase
-    .from("integrations")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("provider", "google_calendar")
-    .maybeSingle();
+  // only while unconnected, and never again once dismissed. The integrations
+  // lookup is skipped entirely once dismissed.
+  const [{ data: moves }, { data: latestBrief }, calendarIntegration] = await Promise.all([
+    supabase
+      .from("recruiting_moves")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("briefs")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    profile.integrations_prompt_dismissed_at
+      ? Promise.resolve(true)
+      : supabase
+          .from("integrations")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("provider", "google_calendar")
+          .maybeSingle()
+          .then((r) => Boolean(r.data)),
+  ]);
 
   const showConnectPrompt =
     !calendarIntegration && !profile.integrations_prompt_dismissed_at;
-
-  const { data: moves } = await supabase
-    .from("recruiting_moves")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
-
-  const { data: latestBrief } = await supabase
-    .from("briefs")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   const allMoves = (moves ?? []) as RecruitingMove[];
   const brief = latestBrief as Brief | null;

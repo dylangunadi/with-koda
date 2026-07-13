@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Brief, RecruitingMove } from "@/lib/types";
-import type { GroundedMove } from "@/lib/koda/grounding";
+import { enforceVerifiedIntegrity, type GroundedMove } from "@/lib/koda/grounding";
 
 /**
  * Persist a brief and its generated moves as one unit.
@@ -24,7 +24,7 @@ export async function insertBriefWithMoves(
     throw new Error(`Failed to create brief: ${briefError?.message ?? "no row"}`);
   }
 
-  const movesToInsert = generated.map((move) => ({
+  const movesToInsert = generated.map(enforceVerifiedIntegrity).map((move) => ({
     user_id: userId,
     brief_id: brief.id,
     title: move.title,

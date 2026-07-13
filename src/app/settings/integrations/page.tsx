@@ -73,7 +73,7 @@ export default async function IntegrationsSettingsPage({
         <NoticeCard tone="ok" text="Google Calendar is connected. Koda pulled your upcoming events." />
       )}
       {connect === "cancelled" && (
-        <NoticeCard tone="muted" text="No problem — nothing was connected and nothing was saved." />
+        <NoticeCard tone="muted" text="No problem. Nothing was connected and nothing was saved." />
       )}
       {connect === "scope_missing" && (
         <NoticeCard

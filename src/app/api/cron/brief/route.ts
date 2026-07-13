@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getCronSecret } from "@/lib/env";
+import { enforceVerifiedIntegrity } from "@/lib/koda/grounding";
+import { createServiceClient } from "@/lib/koda/integrations/serviceClient";
 import { generateRecruitingMoves } from "@/lib/koda/generateRecruitingMoves";
 import { buildAgentContext } from "@/lib/koda/agentContext";
 import { sendBriefEmail } from "@/lib/koda/email";
@@ -31,17 +32,15 @@ export async function GET(request: NextRequest) {
   }
 
   // Use service role client to bypass RLS
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
+  let supabase;
+  try {
+    supabase = createServiceClient();
+  } catch {
     return NextResponse.json(
       { error: "Missing Supabase service config" },
       { status: 500 }
     );
   }
-
-  const supabase = createClient(supabaseUrl, serviceKey);
 
   // Users who consented to scheduled briefs (manual users are excluded even
   // if flags drift).
@@ -103,7 +102,7 @@ export async function GET(request: NextRequest) {
         throw generateError;
       }
 
-      const movesToInsert = moves.map((move) => ({
+      const movesToInsert = moves.map(enforceVerifiedIntegrity).map((move) => ({
         user_id: profile.user_id,
         brief_id: brief.id,
         title: move.title,
