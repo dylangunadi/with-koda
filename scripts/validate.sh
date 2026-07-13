@@ -29,17 +29,28 @@ npm run build
 echo -e "${GREEN}Build passed.${NC}"
 echo ""
 
-# 4. Playwright tests (if browsers are installed)
-if npx playwright install --dry-run &> /dev/null 2>&1 || [ -d "node_modules/playwright-core/.local-browsers" ]; then
-  echo "--- Playwright tests ---"
+# 4. Playwright tests (only when the browser Playwright will use actually
+# exists; honors PLAYWRIGHT_BROWSERS_PATH installs and the
+# PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH override from playwright.config.ts)
+BROWSER_PATH=$(node -e '
+  const fs = require("fs");
+  try {
+    const p = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+      || require("playwright").chromium.executablePath();
+    process.stdout.write(fs.existsSync(p) ? p : "");
+  } catch { /* no playwright or unresolvable browser */ }
+' 2>/dev/null || true)
+
+echo "--- Playwright tests ---"
+if [ -n "$BROWSER_PATH" ]; then
   npx playwright test --project=chromium 2>&1 || {
     echo -e "${RED}Playwright tests failed.${NC}"
     exit 1
   }
   echo -e "${GREEN}Playwright tests passed.${NC}"
 else
-  echo "--- Playwright tests ---"
-  echo "Skipped: Playwright browsers not installed. Run 'npx playwright install' to enable."
+  echo "Skipped: no launchable Chromium found. Run 'npx playwright install chromium'"
+  echo "or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH to an existing browser binary."
 fi
 
 echo ""
