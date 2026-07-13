@@ -198,6 +198,11 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground mt-1">
           Keep this updated so Koda generates better moves for you.
         </p>
+        <p className="text-sm mt-2">
+          <a href="/settings/integrations" className="text-primary underline underline-offset-2 hover:text-foreground">
+            Manage integrations →
+          </a>
+        </p>
       </div>
 
       <div className="space-y-8">

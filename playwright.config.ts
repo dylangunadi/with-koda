@@ -33,6 +33,12 @@ export default defineConfig({
       // Specs assert the deterministic offline provider; never let a test run
       // hit the live model API.
       KODA_AI_MOCK: '1',
+      // Same rule for integrations: deterministic mock adapters, mock OAuth.
+      KODA_INTEGRATIONS_MOCK: '1',
+      // Test-only encryption key so the token vault path is fully exercised.
+      // Not a secret: it protects nothing outside a local test database.
+      KODA_TOKEN_ENC_KEY:
+        process.env.KODA_TOKEN_ENC_KEY ?? 'VGhpc0lzQTMyQnl0ZVRlc3RPbmx5S2V5Rm9yS29kYSE=',
     },
   },
 });

@@ -40,7 +40,15 @@ export type KodaEventName =
   | "scheduled_brief_enabled"
   | "scheduled_brief_disabled"
   | "scheduled_brief_generated"
-  | "scheduled_brief_failed";
+  | "scheduled_brief_failed"
+  | "integration_connected"
+  | "integration_connect_cancelled"
+  | "integration_disconnected"
+  | "integration_synced"
+  | "integration_sync_failed"
+  | "integrations_prompt_dismissed"
+  | "job_board_added"
+  | "job_board_removed";
 
 export function logKodaEvent(
   supabase: SupabaseClient,
