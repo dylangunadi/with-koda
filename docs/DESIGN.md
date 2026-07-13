@@ -38,6 +38,14 @@
 - **Badges**: `rounded-md px-2 py-0.5`
 - **Grain overlay**: SVG noise texture with CSS animation
 
+### Talk to Koda Conversation Surface
+- Full-height chat layout (`src/components/talk/TalkToKoda.tsx`): Koda messages are plain text under a mono "Koda" label; user messages are right-aligned bubbles on the accent background
+- Header carries the mono progress label ("N of 9 covered" → "Review") during onboarding, or a "Back to inbox" link in ongoing mode
+- The transcript container is an `aria-live="polite"` region
+- "Koda is thinking" uses the `status-dot`; the "Offline sample mode" chip (mono, muted) appears whenever the deterministic provider is active — never hide it
+- Voice: push-to-talk mic button beside the composer (hidden when the browser lacks speech support); listening state uses the pulsing `status-dot` plus interim transcript in the hint row; denial shows guidance and disables only the mic
+- Confirmation cards (relationship memory, profile diffs) are standard cards with a mono question label ("Save to memory?" / "Update your profile?"), Confirm + "Not now" buttons, and old values struck through in diffs
+
 ## Required States
 
 ### Loading States
@@ -75,10 +83,14 @@
 - First person for actions: "Save draft", "Run Koda"
 - Second person for descriptions: "Your moves", "Your profile"
 - No jargon or corporate language
+- No em dashes in user-facing copy
 - Banned phrases (from prompts): "circling back", "touching base", "bandwidth", "leverage"
+- Never imply an external action happened: there is no "Send"/"Sent" anywhere; accepting a move means intent, completing means the user did it themselves
+- Label AI provenance honestly: move cards show a mono source line ("From what you told Koda" / "Inferred from your profile" / "Koda's suggestion") with confidence and effort
 
 ### Destructive Actions
-- Reject moves use red styling (`text-red-500`)
+- "Not relevant" (move rejection) uses red styling (`text-red-500`)
+- Conversation proposals never write without explicit confirmation (Confirm / "Not now")
 - Sign out is text-only, no confirmation dialog (low risk — re-sign-in is easy)
 - No delete actions currently exist in the UI
 - Future destructive actions should require confirmation dialog

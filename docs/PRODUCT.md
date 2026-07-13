@@ -12,43 +12,48 @@ Students without inherited recruiting networks struggle to identify who to conta
 
 1. **Landing page** — Learn what Koda does, join the waitlist or sign in
 2. **Sign up / Sign in** — Email + password authentication
-3. **Onboarding** — 4-step profile wizard:
-   - About you (name, school, year)
-   - What you want (roles, industries, company size, locations, target companies)
-   - Your experience (LinkedIn, resume text, work auth)
-   - Focus (goals, free-form context)
-4. **Inbox** — View AI-generated recruiting "moves" in tabs (Today, Saved, Sent, Rejected)
-5. **Run Koda** — Generate 3 new personalized moves via Claude
-6. **Act on moves** — Accept, reject, save, or mark as sent; edit outreach drafts
-7. **Settings** — Update profile, enable autonomous daily/weekly briefs via email
-8. **Autonomous briefs** — Cron generates moves and emails digest to opted-in users
+3. **Talk to Koda** (`/talk`) — Conversational onboarding, text-first with push-to-talk voice input. Koda gathers nine topics: identity (name, school, year), target roles, target companies, recruiting stage, timing and deadlines, locations and work authorization, existing contacts, proof of work, and a one-sentence definition of success. The conversation resumes safely across refreshes and sessions; answered questions are never re-asked.
+4. **Review and confirm** — An editable summary of everything Koda learned, plus a brief schedule choice (Manual only / Weekly / Daily). Confirming creates the profile and the first Koda Brief.
+5. **Inbox** — The persistent Koda Brief: three grounded moves with action tabs (Today, Saved, Completed, Not relevant)
+6. **Act on moves** — Accept move, Mark completed, Save for later, Not relevant; edit outreach drafts. There is no Send action: Koda has no sending integration, so nothing may claim a message went out.
+7. **Ongoing Talk to Koda** — After onboarding, `/talk` stays useful: tell Koda about conversations ("I spoke to Maya at Notion yesterday") to build confirmed relationship memory, change goals (Koda proposes an old-to-new diff you confirm), or ask "what should I do next?" for one concrete grounded recommendation.
+8. **Run Koda** — Generate a fresh brief on demand from the inbox
+9. **Settings** — Edit profile; manage scheduled briefs (in-app briefs need only in-product consent; the email digest additionally requires email confirmation)
+10. **Scheduled briefs** — Cron generates a persisted brief per schedule (idempotent per day) and emails a digest only to confirmed addresses
 
 ## Current Functionality (from code)
 
 - Email/password auth via Supabase Auth
-- Profile creation and editing
-- AI move generation (3 moves per run) via Claude Sonnet with mock fallback
+- Conversational onboarding with structured extraction (`koda_conversations.extracted`), refresh-safe resume, and a review/confirm step
+- Voice input via the Web Speech API where supported: push-to-talk, transcripts append to the composer (typed text is never lost), microphone denial leaves the text flow fully usable
+- First Koda Brief: exactly three moves of distinct types, each labeled by source status (from what you told Koda / inferred / Koda's suggestion) with priority, effort, and expected outcome
+- Briefs are first-class rows (`briefs`) with sources: onboarding, manual, scheduled
 - 5 move types: opportunity, person_to_contact, follow_up, proof_of_work, application_strategy
-- Move actions: accept, reject, save, mark sent, edit outreach draft
-- Agent memory: feedback patterns influence future move generation
-- Rate limiting: 2-minute cooldown between generations
+- Move actions: accept, mark completed, save for later, not relevant, edit outreach draft (accepting means "I intend to act on this" — it never sends anything)
+- Relationship memory (`relationships`): captured through conversation, saved only after explicit confirmation, original message preserved verbatim, feeds future brief generation (the one place real names are allowed in prompts)
+- Profile updates through conversation: whitelisted-field diffs applied only after confirmation
+- Agent memory: accepted, completed, and rejected moves shape future generations; recent board titles are never repeated
+- AI provider abstraction: live Anthropic (Claude Sonnet) or a deterministic offline provider when no API key is configured — offline mode is labeled in the UI and grounded only in user-provided data
+- Rate limiting: 2-minute cooldown between generations; onboarding, confirm, and cron paths are idempotent (unique indexes plus duplicate-submission guards)
+- Product instrumentation in `koda_events` (ids/enums/counts only, never user content); activation query documented in TODOS.md
 - Waitlist signup (public endpoint)
-- Autonomous brief cron (daily at 8 AM UTC, weekly on Mondays)
-- Email digest via Resend (falls back to console logging)
+- Scheduled brief cron (daily at 8 AM UTC, weekly on Mondays), idempotent per user per day
+- Email digest via Resend (falls back to console logging), sent only to confirmed addresses
 - Landing page with marketing copy and waitlist form
 
 ## Non-Goals
 
 - Koda is not a job board or ATS
 - Koda does not apply to jobs on behalf of users
-- Koda does not send messages on behalf of users (user approves every send)
+- Koda does not send messages on behalf of users — there is no Send action anywhere, and the API rejects the legacy `sent` status
+- Koda does not invent people, openings, or research; move sources are labeled
 - No social auth (Google, GitHub, etc.) currently
 
 ## Product Uncertainties (need Dylan's confirmation)
 
 - [ ] Is the waitlist table still in active use, or has it been superseded by direct sign-up?
-- [ ] What is the intended relationship between `resume_text` and `experience_summary` in profiles? Both are populated from the same onboarding field.
-- [ ] Should autonomous briefs require email confirmation before enabling?
-- [ ] What is the target for move generation quality — are mock moves acceptable for MVP launch?
-- [ ] Is there a plan for move deduplication across generations?
+- [ ] What is the intended relationship between `resume_text` and `experience_summary` in profiles?
+- [x] Should autonomous briefs require email confirmation? Resolved: in-app scheduled briefs need in-product consent only; the email digest requires the double-opt-in.
+- [ ] What is the target for move generation quality with the live model — the offline provider is a labeled fallback, not the bar?
+- [ ] Is deeper move deduplication needed beyond prompt-level recent-title avoidance?
 - [ ] What user count is the cron designed to handle (currently sequential per-user)?
