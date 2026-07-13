@@ -62,13 +62,25 @@ async function streamTurn(
     if (!headChecked) {
       const head = buffer.trimStart();
       if (!head) return;
-      headChecked = true;
       // A model that regresses to bare JSON (or a fenced block) with no
       // sentinel must never stream raw braces to the user: hold everything
       // and recover a reply from the parsed object at the end instead.
-      if (head.startsWith("{") || head.startsWith("`")) {
+      if (head.startsWith("{")) {
+        headChecked = true;
         dataOnly = true;
         return;
+      }
+      if (head.startsWith("`")) {
+        // Could be a ``` fence or a legitimate inline-code backtick; wait
+        // until enough streamed in to tell them apart.
+        if (head.length < 3) return;
+        headChecked = true;
+        if (head.startsWith("```")) {
+          dataOnly = true;
+          return;
+        }
+      } else {
+        headChecked = true;
       }
     }
     const sentinelAt = buffer.indexOf(DATA_SENTINEL);

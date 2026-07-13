@@ -402,7 +402,7 @@ export function TalkToKoda({
                 {inCall && stateLabel && (
                   <span className="font-system text-primary">{stateLabel}</span>
                 )}
-                {inCall && call.status === "network_error" && (
+                {inCall && !call.muted && call.status === "network_error" && (
                   <button
                     type="button"
                     onClick={call.reconnect}

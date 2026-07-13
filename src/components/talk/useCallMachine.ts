@@ -148,7 +148,8 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
     // Speech that accumulated while Koda was thinking or speaking still forms
     // a turn. No new recognition result may ever arrive to arm the pause
     // timer, so arm it here or the words would sit unsubmitted forever.
-    if (pendingRef.current.text) {
+    // Muted means muted: pre-mute speech must not auto-submit.
+    if (pendingRef.current.text && !mutedRef.current) {
       clearPauseTimer();
       pauseTimerRef.current = setTimeout(() => {
         if (statusRef.current === "listening") submitPendingTurn();
@@ -177,6 +178,9 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
     };
 
     recognition.onresult = (event) => {
+      // A result already queued when the call ended (or the surface
+      // unmounted) must not repopulate the turn buffer or arm timers.
+      if (!callActiveRef.current || recognitionRef.current !== recognition) return;
       let interimText = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -426,9 +430,12 @@ export function useCallMachine(callbacks: CallMachineCallbacks) {
   useEffect(() => {
     return () => {
       // Kill the call flags FIRST: abort() fires an async onend whose restart
-      // path would otherwise reopen the microphone after unmount.
+      // path would otherwise reopen the microphone after unmount. The status
+      // ref moves off "listening" too, so an already-queued result event can
+      // never submit a phantom turn afterwards.
       callActiveRef.current = false;
       mutedRef.current = true;
+      statusRef.current = "ended";
       if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       recognitionRef.current?.abort();
