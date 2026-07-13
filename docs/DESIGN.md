@@ -14,16 +14,13 @@
 - **Body**: Geist Sans, 15px base
 - **Headings**: Newsreader (serif), `font-heading` class
 - **System labels**: Geist Mono, 11px, uppercase, 0.06em letter-spacing, `font-system` class
-- **Move type badges**: 10px, uppercase, semibold, wide tracking
+- **Move type labels**: 11px, uppercase, semibold, wide tracking, color-by-type text only
 
-### Move Type Colors
-| Type | Light |
-|------|-------|
-| Opportunity | teal-100/teal-800 |
-| Person to contact | blue-100/blue-800 |
-| Follow up | amber-100/amber-800 |
-| Proof of work | purple-100/purple-800 |
-| Application strategy | emerald-100/emerald-800 |
+### Move Cards
+- Neutral cards and borders; category color appears only as a small uppercase text label (teal/blue/amber/purple/emerald by type)
+- Collapsed: type label + effort bucket (mono, top corners), serif title, one why-now paragraph, one dominant CTA (Mark completed, primary teal) with quiet Save for later / Not relevant secondaries
+- Expanded: first step, editable draft, proof-of-work angle, timing, and a single mono provenance line (source status · source note · confidence)
+- Completing collects the actual effort bucket inline (Quick / Focused / Project / Skip); Not relevant offers an optional reason
 
 ### Layout
 - Max width: `max-w-6xl` (landing), `max-w-4xl` (app shell)
@@ -38,12 +35,13 @@
 - **Badges**: `rounded-md px-2 py-0.5`
 - **Grain overlay**: SVG noise texture with CSS animation
 
-### Talk to Koda Conversation Surface
-- Full-height chat layout (`src/components/talk/TalkToKoda.tsx`): Koda messages are plain text under a mono "Koda" label; user messages are right-aligned bubbles on the accent background
+### Talk to Koda Call Surface
+- Fixed viewport (`h-dvh`, `src/components/talk/TalkToKoda.tsx`): the transcript is the only scrolling region; header and controls are anchored, with `env(safe-area-inset-bottom)` padding on mobile
+- Koda messages are plain text under a mono "Koda" label with a pulsing caret while streaming; user messages are right-aligned accent bubbles; live interim speech renders as a dashed ghost bubble
 - Header carries the mono progress label ("N of 9 covered" → "Review") during onboarding, or a "Back to inbox" link in ongoing mode
-- The transcript container is an `aria-live="polite"` region
-- "Koda is thinking" uses the `status-dot`; the "Offline sample mode" chip (mono, muted) appears whenever the deterministic provider is active — never hide it
-- Voice: push-to-talk mic button beside the composer (hidden when the browser lacks speech support); listening state uses the pulsing `status-dot` plus interim transcript in the hint row; denial shows guidance and disables only the mic
+- Completed Koda replies are announced once through a visually hidden `aria-live="polite"` region; the transcript itself is not a live region (streaming deltas would be re-announced word by word)
+- Call controls: round Start call (primary teal) → Mute / Switch to text / End call (destructive-tinted); a "Mic on" chip with the pulsing `status-dot` renders whenever the microphone is actually capturing, and the state word (Listening / Thinking / Koda is speaking / Muted) sits beside it; a "Reconnect" action appears when recognition dies with a network error
+- The text composer is rendered in every state; the "Offline sample mode" chip (mono, muted) appears whenever the deterministic provider is active — never hide it
 - Confirmation cards (relationship memory, profile diffs) are standard cards with a mono question label ("Save to memory?" / "Update your profile?"), Confirm + "Not now" buttons, and old values struck through in diffs
 
 ## Required States

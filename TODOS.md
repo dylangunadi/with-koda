@@ -12,6 +12,28 @@ removed), ongoing Talk to Koda (relationship memory, profile-update proposals,
 next-move recommendations), idempotent scheduled briefs, and koda_events
 instrumentation. 21 Playwright tests cover the critical paths.
 
+## DONE: Sprint 2 — Talk to Koda feels real
+
+Status: shipped on feat/talk-to-koda-onboarding (base for review: 816c1aa)
+
+Delivered: fixed-viewport call interface (internal transcript scroll, anchored
+controls, safe areas), conversational voice state machine (auto-listen, pause
+turn detection, live interim transcript, interruptible sentence-streamed TTS,
+low-confidence correction, honest mic indicator), streamed turns end to end
+(optimistic user messages, instant clear with restore-on-failure, client turn
+ids deduped server-side, turn_latency measurement), spoken-conversation prompt
+rework (one short question, skips and corrections, contradiction clarification),
+end-of-call summary explaining what Koda does with the data, calm collapsed and
+expanded move cards with one dominant CTA, rejection reasons, and effort-bucket
+calibration (predicted vs actual). validate.sh browser detection fixed;
+scripts/smoke-live-provider.mjs added for live-key verification.
+
+Remaining from the sprint's Priority 0 (require things this sandbox lacks):
+- [ ] Run the live Anthropic provider end to end (node scripts/smoke-live-provider.mjs wherever ANTHROPIC_API_KEY exists)
+- [ ] Exercise a call with a real microphone and speakers (headless sandboxes cannot)
+- [ ] Run the real codex CLI review (needs OpenAI credentials; substitute reviews in .agent/reviews/)
+- [ ] Apply supabase/migrations/20260713120000_effort_buckets.sql to koda-staging and production
+
 ## Analytics
 
 Product events live in the `koda_events` table (see src/lib/koda/events.ts for
@@ -50,6 +72,9 @@ Funnel rates: compare distinct-user counts of `onboarding_started`,
 - [ ] Configure `storageState` in Playwright for authenticated test reuse
 - [ ] Add unit test framework (Vitest) for `lib/koda/` functions
 - [ ] Enforce koda_events RLS so browsers cannot write events directly (whitelist lives in /api/events; today a user can only pollute their own rows)
+- [ ] Turn-id dedup: add a partial unique index on (conversation_id, payload->>'turn_id') with a 23505 fetch-existing arm, plus a spec replaying an explicit turnId (review round 3, L1)
+- [ ] Streamed-turn persistence edges: skip the duplicate user-row insert when the last user row already carries the same turn_id; speak deduped-retry replies during calls (review round 3, L2)
+- [ ] Voice test depth: fail-after-delta AI injection variant, hold-open delta gate mirroring __holdSpeech, mid-stream disconnect spec (review round 3, L7)
 
 ## Later
 

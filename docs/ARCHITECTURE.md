@@ -8,7 +8,7 @@
 - **Theme**: next-themes (light default, system disabled)
 - **Analytics**: @vercel/analytics (pageviews) + internal `koda_events` table (product events)
 - **Toasts**: sonner
-- **Voice**: Web Speech API via `useSpeechRecognition` (feature-detected; text input always primary)
+- **Voice**: Web Speech API via `useCallMachine` (feature-detected call state machine: recognition + interruptible TTS; text input always primary)
 
 ## Backend Services
 
@@ -16,7 +16,7 @@ All backend logic runs as Next.js API routes and server actions:
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/api/talk` | POST | User | One conversational turn (onboarding mode until a profile exists, then ongoing mode) |
+| `/api/talk` | POST | User | One conversational turn, streamed as an event stream of reply deltas plus a final payload (onboarding mode until a profile exists, then ongoing) |
 | `/api/talk/confirm` | POST | User | Resolve a pending conversation proposal (relationship memory or profile diff) |
 | `/api/events` | POST | User | Whitelisted client-originated product events |
 | `/api/moves` | GET | User | List moves (optional status filter) |
@@ -33,8 +33,8 @@ Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist review
 
 `src/lib/koda/ai/` defines one `KodaAI` interface (`onboardingTurn`, `ongoingTurn`, `generateMoves`) with two implementations:
 
-- **anthropic.ts** — Claude Sonnet; strict-JSON outputs only (no chain-of-thought reaches the client); model proposals are sanitized against whitelists.
-- **mock.ts** — deterministic offline provider, active when `KODA_AI_MOCK=1` or no `ANTHROPIC_API_KEY`. Grounded exclusively in user-provided data, and always labeled ("Offline sample mode" chip; prefixed source notes).
+- **anthropic.ts** — Claude Sonnet, streaming. Turn responses use a reply-first protocol (plain spoken text, then a `<<<DATA>>>` sentinel, then JSON metadata) so words reach the client as the model produces them; the sentinel is held back from deltas and metadata parsing is best-effort. Proposals are sanitized against whitelists; no chain-of-thought reaches the client.
+- **mock.ts** — deterministic offline provider, active when `KODA_AI_MOCK=1` or no `ANTHROPIC_API_KEY`. Streams reply text in fixed chunks, grounded exclusively in user-provided data, and always labeled ("Offline sample mode" chip; prefixed source notes).
 
 Server-authoritative rules regardless of provider: the onboarding checklist and `done` decision are computed server-side; extraction merges never empty a field; ongoing-mode proposals write nothing until `/api/talk/confirm`; old profile values in diffs are filled server-side. A test-only failure-injection header (`x-koda-test-ai: fail`) works only in mock mode outside production and can only cause failures.
 
@@ -54,7 +54,7 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
 - Core tables (+ waitlist):
   - `profiles` — user recruiting profiles (1:1 with auth.users), including conversational-onboarding fields (`recruiting_stage`, `timeline`, `proof_points`, `success_definition`, `contacts_notes`) and brief settings
   - `briefs` — first-class brief rows (source: onboarding | manual | scheduled) with partial unique indexes for one-onboarding-brief-per-user and one-scheduled-brief-per-user-per-day
-  - `recruiting_moves` — generated moves (linked by `brief_id`; display fields `priority`, `effort`, `expected_outcome`, `source_status`)
+  - `recruiting_moves` — generated moves (linked by `brief_id`; display fields `priority`, `effort`, `effort_bucket` quick/focused/project, `actual_effort_bucket` reported at completion for calibration, `expected_outcome`, `source_status`)
   - `move_events` — feedback/action tracking
   - `koda_conversations` / `koda_messages` — conversation state; `extracted` jsonb is the structured resume mechanism; proposals live on message payloads
   - `relationships` — confirmed relationship memory; `source_message` preserves the user's words verbatim
@@ -88,8 +88,8 @@ scripts/           — Dev, validation, and review scripts
 ## Key Data Flows
 
 ### Conversational Onboarding
-1. New user hits `/talk` (routed from signup, login, or the inbox guard)
-2. Each message → `POST /api/talk`: load/create the active conversation, compute missing checklist fields server-side, call the provider, additively merge the extraction, persist both messages and the merged state (a failed turn persists nothing; the client keeps the input and offers retry)
+1. New user hits `/talk` (routed from signup, login, or the inbox guard): a fixed-viewport call surface. Start call enters a voice state machine (`src/components/talk/useCallMachine.ts`): automatic listening, pause-based turn detection, sentence-streamed TTS the user can interrupt (a barge-in also silences the rest of that streaming reply, and speech captured while a turn is still in flight goes to the composer instead of being dropped), low-confidence transcripts routed to the composer, truthful mic indication with a manual Reconnect after network errors, and a wind-down at the end of onboarding (mic off first, the spoken summary finishes, then the call ends). Unmounting the surface mid-call releases the microphone unconditionally. The text composer is always available.
+2. Each turn → `POST /api/talk` (streamed): load/create the active conversation, compute missing checklist fields server-side, stream the provider's reply as deltas, additively merge the extraction, persist both messages and the merged state only after the provider completes (a failed turn persists nothing; the optimistic user bubble rolls back into the composer and retry reuses the same client turn id, which the server dedupes)
 3. When the server-side checklist is empty, the review screen renders; `confirmOnboarding` upserts the profile, closes the conversation, and generates the first brief through `insertBriefWithMoves` (double-confirm safe)
 
 ### Ongoing Conversation
