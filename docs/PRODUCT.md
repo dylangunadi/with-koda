@@ -12,7 +12,7 @@ Students without inherited recruiting networks struggle to identify who to conta
 
 1. **Landing page** — Learn what Koda does, join the waitlist or sign in
 2. **Sign up / Sign in** — Email + password authentication
-3. **Talk to Koda** (`/talk`) — A contained call: start the call and Koda listens automatically, detects when you finish speaking, streams its reply in text and speech, and can be interrupted mid-sentence. Mute, switch to text, or end the call at any time; the text composer is always available. Koda gathers nine topics: identity (name, school, year), target roles, target companies, recruiting stage, timing and deadlines, locations and work authorization, existing contacts, proof of work, and a one-sentence definition of success. The conversation resumes safely across refreshes and sessions; answered questions are never re-asked.
+3. **Talk to Koda** (`/talk`) — A contained chat: the page never grows, the transcript scrolls internally and follows the conversation, and Koda's replies stream in live. Koda gathers nine topics: identity (name, school, year), target roles, target companies, recruiting stage, timing and deadlines, locations and work authorization, existing contacts, proof of work, and a one-sentence definition of success. The conversation resumes safely across refreshes and sessions; answered questions are never re-asked. (A voice-call version of onboarding is parked on the `feat/voice-call-onboarding` branch.)
 4. **Review and confirm** — An editable summary of everything Koda learned, plus a brief schedule choice (Manual only / Weekly / Daily). Confirming creates the profile and the first Koda Brief.
 5. **Inbox** — The persistent Koda Brief: three grounded moves with action tabs (Today, Saved, Completed, Not relevant)
 6. **Act on moves** — Mark completed (reporting how long it really took), Save for later, or Not relevant with an optional reason; edit outreach drafts. There is no Send action: Koda has no sending integration, so nothing may claim a message went out.
@@ -25,7 +25,7 @@ Students without inherited recruiting networks struggle to identify who to conta
 
 - Email/password auth via Supabase Auth
 - Conversational onboarding with structured extraction (`koda_conversations.extracted`), refresh-safe resume, and a review/confirm step
-- Real conversational voice via the Web Speech API where supported: automatic listening with live interim transcript, pause-based turn taking, interruptible spoken replies, low-confidence transcripts offered for correction before sending, an honest mic-on indicator, and no raw audio ever stored; microphone denial leaves the text flow fully usable
+- Streamed chat turns: optimistic user messages, instant composer clear with restore-on-failure, live streaming replies (voice calls are parked on `feat/voice-call-onboarding`)
 - First Koda Brief: exactly three moves of distinct types, each labeled by source status (from what you told Koda / inferred / Koda's suggestion) with a broad effort bucket (Quick under 15 min / Focused 15-45 min / Project); predicted-versus-actual effort calibrates future sizing
 - Briefs are first-class rows (`briefs`) with sources: onboarding, manual, scheduled
 - 5 move types: opportunity, person_to_contact, follow_up, proof_of_work, application_strategy

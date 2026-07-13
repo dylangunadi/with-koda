@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, Phone, PhoneOff, Keyboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ReviewConfirm } from "@/components/talk/ReviewConfirm";
 import { ConfirmationCard } from "@/components/talk/ConfirmationCard";
-import { useCallMachine, type CallStatus } from "@/components/talk/useCallMachine";
 import type { OngoingProposal } from "@/lib/koda/ai/provider";
 import type { OnboardingExtracted } from "@/lib/types";
 
@@ -37,21 +35,17 @@ const ONBOARDING_GREETING =
 const ONGOING_GREETING =
   "What happened since we last talked? Tell me about conversations you have had, changes to your goals, or ask me what to do next.";
 
-const STATE_LABELS: Partial<Record<CallStatus, string>> = {
-  connecting: "Connecting",
-  listening: "Listening",
-  processing: "Thinking",
-  speaking: "Koda is speaking",
-  network_error: "Connection trouble",
-  recognition_error: "Could not hear that",
-};
-
 interface TurnAttempt {
   text: string;
   turnId: string;
-  voice: boolean;
 }
 
+/**
+ * Talk to Koda: a contained chat surface. The page never grows — the
+ * transcript is the only scrolling region and follows new messages, while
+ * the header and composer stay fixed. Voice calls live on the
+ * feat/voice-call-onboarding branch.
+ */
 export function TalkToKoda({
   mode,
   initialMessages,
@@ -85,7 +79,6 @@ export function TalkToKoda({
       : initialMessages;
   });
   const [input, setInput] = useState("");
-  const [inputHint, setInputHint] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<OnboardingExtracted>(initialExtracted);
@@ -98,66 +91,44 @@ export function TalkToKoda({
   const inFlightRef = useRef(false);
   const lastAttemptRef = useRef<TurnAttempt | null>(null);
 
-  const sendRef = useRef<(text: string, voice: boolean, retryTurnId?: string) => void>(() => {});
-
-  const call = useCallMachine({
-    onTurnReady: (text, { lowConfidence }) => {
-      if (lowConfidence || inFlightRef.current) {
-        // Low confidence: let the user correct what was heard before it goes
-        // anywhere. Turn still in flight (they interrupted and kept talking):
-        // never drop their words silently; hand them to the composer.
-        setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
-        setInputHint(
-          inFlightRef.current
-            ? "Koda was still answering. Send this when you are ready."
-            : "Check what Koda heard, then send."
-        );
-        inputRef.current?.focus();
-        return;
-      }
-      sendRef.current(text, true);
-    },
-  });
-
+  // The transcript follows the conversation so the newest words are always
+  // in view without the user (or the page) having to grow and chase them.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, done, call.status]);
+  }, [messages, done]);
 
   const send = useCallback(
-    async (rawText: string, voice: boolean, retryTurnId?: string) => {
+    async (rawText: string, retryTurnId?: string) => {
       const text = rawText.trim();
       if (!text || inFlightRef.current || done) return;
       inFlightRef.current = true;
       setSending(true);
       setError(null);
-      setInputHint(null);
 
       const turnId = retryTurnId ?? crypto.randomUUID();
-      lastAttemptRef.current = { text, turnId, voice };
+      lastAttemptRef.current = { text, turnId };
 
       // Optimistic: the user's words appear instantly; the composer clears
       // instantly. On failure both are restored.
-      if (!voice) setInput("");
+      setInput("");
       setMessages((prev) => [
         ...prev,
         { role: "user", content: text },
         { role: "koda", content: "", streaming: true },
       ]);
-      call.beginProcessing();
 
-      const startedAt = performance.now();
-      let firstDeltaAt: number | null = null;
       let sawFinal = false;
       let failed = false;
+      const startedAt = performance.now();
+      let firstDeltaAt: number | null = null;
 
-      const failTurn = (message: string, kind: "ai_error" | "network_error") => {
+      const failTurn = (message: string) => {
         failed = true;
         // Roll back the streaming placeholder and the optimistic user bubble;
         // the words return to the composer so nothing is lost.
         setMessages((prev) => prev.filter((m) => !m.streaming).slice(0, -1));
         setInput(text);
         setError(message);
-        call.failTurn(kind);
         inputRef.current?.focus();
       };
 
@@ -165,11 +136,11 @@ export function TalkToKoda({
         const res = await fetch("/api/talk", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ message: text, inputMode: voice ? "voice" : "text", turnId }),
+          body: JSON.stringify({ message: text, inputMode: "text", turnId }),
         });
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => ({}));
-          failTurn(data.error ?? "Koda could not process that. Try again.", "ai_error");
+          failTurn(data.error ?? "Koda could not process that. Try again.");
           return;
         }
 
@@ -182,7 +153,6 @@ export function TalkToKoda({
           if (event.type === "delta" && typeof event.text === "string") {
             if (firstDeltaAt === null) firstDeltaAt = performance.now();
             streamedReply += event.text;
-            call.speakDelta(event.text);
             setMessages((prev) =>
               prev.map((m) => (m.streaming ? { ...m, content: streamedReply } : m))
             );
@@ -206,15 +176,9 @@ export function TalkToKoda({
             if (onboarding) {
               setExtracted((event.extracted as OnboardingExtracted) ?? {});
               setMissing((event.missing as string[]) ?? []);
-              if (event.done) {
-                setDone(true);
-                // Wind down: the mic stops now, the spoken summary finishes
-                // (finishTurn below drains it), then the call ends on its own.
-                call.windDown();
-              }
+              if (event.done) setDone(true);
             }
             if (typeof event.aiMode === "string") setAiMode(event.aiMode);
-            call.finishTurn();
 
             const totalMs = performance.now() - startedAt;
             fetch("/api/events", {
@@ -231,8 +195,7 @@ export function TalkToKoda({
             }).catch(() => {});
           } else if (event.type === "error") {
             failTurn(
-              typeof event.error === "string" ? event.error : "Koda could not process that.",
-              "ai_error"
+              typeof event.error === "string" ? event.error : "Koda could not process that."
             );
           }
         };
@@ -250,38 +213,36 @@ export function TalkToKoda({
           }
         }
         if (!sawFinal && !failed) {
-          failTurn("The connection dropped mid-reply. Try again.", "network_error");
+          failTurn("The connection dropped mid-reply. Try again.");
         }
       } catch {
-        failTurn("Network problem. Your message is still here, try again.", "network_error");
+        failTurn("Network problem. Your message is still here, try again.");
       } finally {
         inFlightRef.current = false;
         setSending(false);
-        if (!voice) inputRef.current?.focus();
+        inputRef.current?.focus();
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [done, onboarding, mode, call.beginProcessing, call.speakDelta, call.finishTurn, call.failTurn, call.windDown]
+    [done, onboarding, mode]
   );
-
-  useEffect(() => {
-    sendRef.current = send;
-  }, [send]);
 
   const retry = () => {
     const attempt = lastAttemptRef.current;
     if (!attempt) return;
-    call.resumeListening();
-    send(input.trim() || attempt.text, attempt.voice, attempt.turnId);
+    send(input.trim() || attempt.text, attempt.turnId);
   };
 
   const answered = totalFields - missing.length;
-  const inCall = call.callActive;
-  const stateLabel = call.muted && inCall ? "Muted" : STATE_LABELS[call.status];
 
   return (
     <div className="h-dvh bg-background relative overflow-hidden flex flex-col">
       <div className="grain fixed inset-0 pointer-events-none" />
+
+      {/* Screen readers hear each completed reply once; a live region on the
+          transcript itself would re-announce every streamed word. */}
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
 
       <header className="relative z-10 shrink-0 border-b border-border/40 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-6">
@@ -310,12 +271,6 @@ export function TalkToKoda({
           </div>
         </div>
       </header>
-
-      {/* Screen readers hear each completed reply once; a live region on the
-          transcript itself would re-announce every streamed word. */}
-      <div aria-live="polite" className="sr-only">
-        {announcement}
-      </div>
 
       {/* Transcript: the only scrolling region; the page never grows. */}
       <div ref={scrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto">
@@ -351,20 +306,13 @@ export function TalkToKoda({
               </div>
             )
           )}
-          {inCall && call.interim && (
-            <div className="max-w-[85%] ml-auto">
-              <div className="rounded-xl border border-dashed border-primary/40 px-4 py-3 text-[15px] leading-relaxed text-muted-foreground italic">
-                {call.interim}
-              </div>
-            </div>
-          )}
           {done && onboarding && (
             <ReviewConfirm extracted={extracted} onDone={() => router.push("/inbox?from=talk")} />
           )}
         </div>
       </div>
 
-      {/* Persistent controls. Text input stays available in every state. */}
+      {/* Composer: pinned to the bottom, available in every state. */}
       {!done && (
         <div className="relative z-10 shrink-0 border-t border-border/40 bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto max-w-2xl px-6 py-3 space-y-3">
@@ -384,87 +332,10 @@ export function TalkToKoda({
                 </button>
               </div>
             )}
-            {call.status === "permission_denied" && (
-              <p role="alert" className="font-system text-destructive">
-                Microphone is blocked. Keep typing, or allow the mic in your browser settings.
-              </p>
-            )}
-
-            {/* Call controls */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2" aria-live="polite">
-                {call.micActive && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 font-system text-accent-foreground">
-                    <span className="status-dot" aria-hidden />
-                    Mic on
-                  </span>
-                )}
-                {inCall && stateLabel && (
-                  <span className="font-system text-primary">{stateLabel}</span>
-                )}
-                {inCall && !call.muted && call.status === "network_error" && (
-                  <button
-                    type="button"
-                    onClick={call.reconnect}
-                    className="font-system text-primary underline underline-offset-2"
-                  >
-                    Reconnect
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {call.supported && !inCall && call.status !== "permission_denied" && (
-                  <Button
-                    type="button"
-                    onClick={call.startCall}
-                    className="h-10 rounded-full bg-primary px-5 font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
-                  >
-                    <Phone className="size-4" aria-hidden />
-                    <span>{call.status === "ended" ? "Call again" : "Start call"}</span>
-                  </Button>
-                )}
-                {inCall && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={call.toggleMute}
-                      aria-pressed={call.muted}
-                      className="h-10 rounded-full px-4"
-                    >
-                      {call.muted ? <MicOff className="size-4" aria-hidden /> : <Mic className="size-4" aria-hidden />}
-                      <span>{call.muted ? "Unmute" : "Mute"}</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        call.endCall();
-                        inputRef.current?.focus();
-                      }}
-                      className="h-10 rounded-full px-4"
-                    >
-                      <Keyboard className="size-4" aria-hidden />
-                      <span>Switch to text</span>
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={call.endCall}
-                      className="h-10 rounded-full bg-destructive/10 px-4 font-semibold text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors"
-                    >
-                      <PhoneOff className="size-4" aria-hidden />
-                      <span>End call</span>
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Composer: the text path is always available. */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                send(input, false);
+                send(input);
               }}
               className="flex items-end gap-3"
             >
@@ -475,7 +346,7 @@ export function TalkToKoda({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    send(input, false);
+                    send(input);
                   }
                 }}
                 placeholder={onboarding ? "Type your answer" : "Tell Koda what happened, or ask what to do next"}
@@ -493,7 +364,7 @@ export function TalkToKoda({
               </Button>
             </form>
             <p className="min-h-4 font-system text-muted-foreground">
-              {inputHint ?? "Enter to send. Shift plus Enter for a new line."}
+              Enter to send. Shift plus Enter for a new line.
             </p>
           </div>
         </div>

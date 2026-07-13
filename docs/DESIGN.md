@@ -35,14 +35,14 @@
 - **Badges**: `rounded-md px-2 py-0.5`
 - **Grain overlay**: SVG noise texture with CSS animation
 
-### Talk to Koda Call Surface
-- Fixed viewport (`h-dvh`, `src/components/talk/TalkToKoda.tsx`): the transcript is the only scrolling region; header and controls are anchored, with `env(safe-area-inset-bottom)` padding on mobile
-- Koda messages are plain text under a mono "Koda" label with a pulsing caret while streaming; user messages are right-aligned accent bubbles; live interim speech renders as a dashed ghost bubble
+### Talk to Koda Chat Surface
+- Fixed viewport (`h-dvh`, `src/components/talk/TalkToKoda.tsx`): the transcript is the only scrolling region and auto-follows new messages; the header and composer are anchored, with `env(safe-area-inset-bottom)` padding on mobile — the page itself never grows or scrolls
+- Koda messages are plain text under a mono "Koda" label with a pulsing caret while streaming; user messages are right-aligned accent bubbles
 - Header carries the mono progress label ("N of 9 covered" → "Review") during onboarding, or a "Back to inbox" link in ongoing mode
 - Completed Koda replies are announced once through a visually hidden `aria-live="polite"` region; the transcript itself is not a live region (streaming deltas would be re-announced word by word)
-- Call controls: round Start call (primary teal) → Mute / Switch to text / End call (destructive-tinted); a "Mic on" chip with the pulsing `status-dot` renders whenever the microphone is actually capturing, and the state word (Listening / Thinking / Koda is speaking / Muted) sits beside it; a "Reconnect" action appears when recognition dies with a network error
-- The text composer is rendered in every state; the "Offline sample mode" chip (mono, muted) appears whenever the deterministic provider is active — never hide it
+- The composer is pinned at the bottom in every state; the "Offline sample mode" chip (mono, muted) appears whenever the deterministic provider is active — never hide it
 - Confirmation cards (relationship memory, profile diffs) are standard cards with a mono question label ("Save to memory?" / "Update your profile?"), Confirm + "Not now" buttons, and old values struck through in diffs
+- Voice calls (orb, mic, TTS) live on the `feat/voice-call-onboarding` branch, not here
 
 ## Required States
 

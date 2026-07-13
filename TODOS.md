@@ -30,9 +30,17 @@ scripts/smoke-live-provider.mjs added for live-key verification.
 
 Remaining from the sprint's Priority 0 (require things this sandbox lacks):
 - [ ] Run the live Anthropic provider end to end (node scripts/smoke-live-provider.mjs wherever ANTHROPIC_API_KEY exists)
-- [ ] Exercise a call with a real microphone and speakers (headless sandboxes cannot)
 - [ ] Run the real codex CLI review (needs OpenAI credentials; substitute reviews in .agent/reviews/)
-- [ ] Apply supabase/migrations/20260713120000_effort_buckets.sql to koda-staging and production
+- [x] Apply supabase/migrations/20260713120000_effort_buckets.sql (Dylan ran it in the SQL editor)
+
+## PARKED: Voice-call onboarding (branch feat/voice-call-onboarding)
+
+Product decision (2026-07-13): ship chat-first; the call experience is
+overbuilt for the MVP. This branch is chat-only. The voice work lives on
+feat/voice-call-onboarding: half-duplex mic (echo fix), tap-to-interrupt,
+OpenAI TTS proxy (/api/voice/tts, needs OPENAI_API_KEY), call-first orb UI.
+Known remaining work there: Playwright voice specs need updating for the new
+call surface; real-mic and live-TTS verification.
 
 ## Analytics
 
@@ -74,7 +82,7 @@ Funnel rates: compare distinct-user counts of `onboarding_started`,
 - [ ] Enforce koda_events RLS so browsers cannot write events directly (whitelist lives in /api/events; today a user can only pollute their own rows)
 - [ ] Turn-id dedup: add a partial unique index on (conversation_id, payload->>'turn_id') with a 23505 fetch-existing arm, plus a spec replaying an explicit turnId (review round 3, L1)
 - [ ] Streamed-turn persistence edges: skip the duplicate user-row insert when the last user row already carries the same turn_id; speak deduped-retry replies during calls (review round 3, L2)
-- [ ] Voice test depth: fail-after-delta AI injection variant, hold-open delta gate mirroring __holdSpeech, mid-stream disconnect spec (review round 3, L7)
+- [ ] Voice test depth (applies to feat/voice-call-onboarding only): fail-after-delta AI injection variant, hold-open delta gate, mid-stream disconnect spec (review round 3, L7)
 
 ## Later
 

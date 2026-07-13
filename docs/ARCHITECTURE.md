@@ -8,7 +8,7 @@
 - **Theme**: next-themes (light default, system disabled)
 - **Analytics**: @vercel/analytics (pageviews) + internal `koda_events` table (product events)
 - **Toasts**: sonner
-- **Voice**: Web Speech API via `useCallMachine` (feature-detected call state machine: recognition + interruptible TTS; text input always primary)
+- **Voice**: none on this branch — the call experience (Web Speech + cloud TTS) is parked on `feat/voice-call-onboarding`
 
 ## Backend Services
 
@@ -88,7 +88,7 @@ scripts/           — Dev, validation, and review scripts
 ## Key Data Flows
 
 ### Conversational Onboarding
-1. New user hits `/talk` (routed from signup, login, or the inbox guard): a fixed-viewport call surface. Start call enters a voice state machine (`src/components/talk/useCallMachine.ts`): automatic listening, pause-based turn detection, sentence-streamed TTS the user can interrupt (a barge-in also silences the rest of that streaming reply, and speech captured while a turn is still in flight goes to the composer instead of being dropped), low-confidence transcripts routed to the composer, truthful mic indication with a manual Reconnect after network errors, and a wind-down at the end of onboarding (mic off first, the spoken summary finishes, then the call ends). Unmounting the surface mid-call releases the microphone unconditionally. The text composer is always available.
+1. New user hits `/talk` (routed from signup, login, or the inbox guard): a fixed-viewport chat surface. The transcript is the only scrolling region and follows the conversation; the composer stays pinned at the bottom.
 2. Each turn → `POST /api/talk` (streamed): load/create the active conversation, compute missing checklist fields server-side, stream the provider's reply as deltas, additively merge the extraction, persist both messages and the merged state only after the provider completes (a failed turn persists nothing; the optimistic user bubble rolls back into the composer and retry reuses the same client turn id, which the server dedupes)
 3. When the server-side checklist is empty, the review screen renders; `confirmOnboarding` upserts the profile, closes the conversation, and generates the first brief through `insertBriefWithMoves` (double-confirm safe)
 
