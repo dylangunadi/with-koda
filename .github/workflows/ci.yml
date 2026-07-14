@@ -46,34 +46,44 @@ jobs:
           set -euo pipefail
           eval "$(supabase status -o env)"
 
+          # Byte-exact reconstruction of the CLI's deterministic legacy JWTs:
+          # header {"alg":"HS256","typ":"JWT"}, payload
+          # {"iss":"supabase-demo","role":<role>,"exp":1983812996} — the same
+          # strings the local Kong registers as consumers, so they pass its
+          # exact-match apikey check.
           mint() {
             node -e '
               const c = require("crypto");
-              const secret = process.env.JWT_SECRET;
-              const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
-              const header = b64({ alg: "HS256", typ: "JWT" });
-              const payload = b64({ role: process.argv[1], iss: "supabase-demo", iat: 1700000000, exp: 2100000000 });
+              const secret = process.env.JWT_SECRET || "super-secret-jwt-token-with-at-least-32-characters-long";
+              const b64 = (s) => Buffer.from(s).toString("base64url");
+              const header = b64(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+              const payload = b64(JSON.stringify({ iss: "supabase-demo", role: process.argv[1], exp: 1983812996 }));
               const sig = c.createHmac("sha256", secret).update(header + "." + payload).digest("base64url");
               console.log(header + "." + payload + "." + sig);
             ' "$1"
           }
-          works() {
-            code=$(curl -s -o /dev/null -w '%{http_code}' \
+          probe() {
+            curl -s -o /dev/null -w '%{http_code}' \
               "$API_URL/rest/v1/profiles?select=user_id&limit=1" \
-              -H "apikey: $1" -H "Authorization: Bearer $1")
-            [ "$code" = "200" ]
+              -H "apikey: $1" -H "Authorization: Bearer $1"
+          }
+          works() {
+            [ "$(probe "$1")" = "200" ]
           }
 
           SERVICE_KEY="$SERVICE_ROLE_KEY"
           ANON="$ANON_KEY"
           if ! works "$SERVICE_KEY"; then
-            echo "Reported service key rejected by the data API; minting legacy JWTs from JWT_SECRET."
-            SERVICE_KEY=$(JWT_SECRET="$JWT_SECRET" mint service_role)
-            ANON=$(JWT_SECRET="$JWT_SECRET" mint anon)
+            echo "Reported service key rejected by the data API (HTTP $(probe "$SERVICE_KEY")); minting legacy JWTs."
+            SERVICE_KEY=$(JWT_SECRET="${JWT_SECRET:-}" mint service_role)
+            ANON=$(JWT_SECRET="${JWT_SECRET:-}" mint anon)
             if ! works "$SERVICE_KEY"; then
-              echo "No working service-role credential for the local stack." >&2
+              echo "Legacy service JWT also rejected (HTTP $(probe "$SERVICE_KEY"))." >&2
+              echo "status -o env variables available:" >&2
+              supabase status -o env | sed 's/=.*/=<set>/' >&2 || true
               exit 1
             fi
+            echo "Legacy JWTs accepted."
           fi
 
           cat > .env.local <<EOF
