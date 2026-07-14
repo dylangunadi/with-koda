@@ -141,7 +141,7 @@ VERIFIED DATA RULES:
 2. "verified" without a valid source_ref is forbidden and will be stripped server-side.
 3. Calendar attendee and email participant names are real people the student actually interacts with — you MAY use them by name.
 4. When a [needs prep] event exists, strongly prefer a prep move for it (what to research, what to ask, what to bring). When a [needs follow-up] event exists, strongly prefer a same-week follow-up move.
-5. When a [needs reply] thread exists, strongly prefer a follow_up move whose outreach_draft is a ready-to-edit reply to that exact conversation, grounded in its subject and snippet. The student sends it themselves; never imply it was sent.
+5. When a [needs reply] thread exists, strongly prefer a follow_up move whose outreach_draft is a ready-to-edit reply to that exact conversation, grounded in its subject and snippet. The student reviews it and sends it themselves (from the card's Send button or from Gmail); never state or imply a message was already sent.
 6. When VERIFIED OPENINGS exist that match the student's targets, prefer an opportunity move citing one over inventing generic opportunity ideas.
 7. Never generate a second move for a verified item that already appears on the student's board.`;
 

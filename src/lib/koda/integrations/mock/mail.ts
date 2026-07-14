@@ -48,4 +48,7 @@ export const mockMailSource: MailSource = {
   async createDraft() {
     return { draftId: "mock-draft-1" };
   },
+  async sendMessage() {
+    return { messageId: "mock-sent-1" };
+  },
 };

@@ -5,7 +5,9 @@ import type { MailPullResult, MailSource, NormalizedThread } from "../types";
  * Gmail adapter over plain fetch. Read side: thread search scoped to the
  * user's configured recruiting query with format=metadata — headers and the
  * API's own snippet only, never message bodies. Write side: draft creation
- * exclusively (users/me/drafts). There is no call to messages.send anywhere.
+ * (users/me/drafts) and messages.send — each called exclusively from its
+ * explicit-per-move route, sending the user-approved text verbatim. Nothing
+ * in sync, cron, or AI-driven code can reach either write.
  */
 
 const GMAIL_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -152,5 +154,25 @@ export const gmailSource: MailSource = {
     }
     const data = await res.json();
     return { draftId: String(data.id ?? "") };
+  },
+
+  async sendMessage({ accessToken, to, subject, body, threadId }) {
+    const res = await fetch(`${GMAIL_BASE}/messages/send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      body: JSON.stringify({
+        raw: buildRawMessage({ to, subject, body }),
+        ...(threadId ? { threadId } : {}),
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`Gmail send failed (${res.status})`);
+    }
+    const data = await res.json();
+    return { messageId: String(data.id ?? "") };
   },
 };

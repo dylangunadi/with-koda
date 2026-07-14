@@ -64,9 +64,9 @@ export default async function IntegrationsSettingsPage({
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Koda reads these sources to ground your briefs in real events and real
-          openings. Koda never sends email, never creates or changes calendar
-          events, and never contacts anyone. Disconnecting deletes everything
-          Koda imported.
+          openings. Koda acts only when you press a button on a specific move:
+          it never sends on its own, and never creates or changes calendar
+          events. Disconnecting deletes everything Koda imported.
         </p>
         <p className="text-sm mt-2">
           <Link href="/settings" className="text-primary underline underline-offset-2 hover:text-foreground">

@@ -5,9 +5,9 @@ import type { MoveEventType } from "@/lib/types";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// 'sent' is intentionally absent: no sending integration exists, so the API
-// must not accept a claim that a message went out. Legacy 'sent' rows remain
-// readable but no new ones can be created.
+// 'sent' stays absent from client-settable statuses: real sends happen only
+// in /api/integrations/gmail/send, which records them server-side with
+// Gmail's message id. No client may merely *claim* a message went out.
 const STATUS_TO_EVENT: Record<string, MoveEventType> = {
   generated: "generated",
   accepted: "accepted",

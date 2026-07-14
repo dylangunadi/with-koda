@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
         source_status: move.source_status,
         external_event_id: move.external_event_id ?? null,
         external_opportunity_id: move.external_opportunity_id ?? null,
+        external_thread_id: move.external_thread_id ?? null,
         source_url: move.source_url ?? null,
         source_fetched_at: move.source_fetched_at ?? null,
         status: "generated" as const,

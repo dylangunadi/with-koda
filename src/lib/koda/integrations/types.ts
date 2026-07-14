@@ -1,10 +1,13 @@
 /**
  * Provider adapter contracts for the integration layer.
  *
- * Adapters are pull-only by design: there is no interface through which an
- * adapter can send, create, or modify anything on the provider side, so
- * "Koda never contacts anyone" is structural rather than policy. Adapters
- * never touch token storage — the sync engine injects a valid access token.
+ * Adapters are pull-only, with exactly two mail writes: createDraft and
+ * sendMessage. Each is reachable from exactly one user-authenticated route
+ * on an explicit per-move click; the sync engine, cron, and every AI-driven
+ * path have no access to them, and no LLM output is on the send path (the
+ * saved draft is sent verbatim to a recipient derived from the user's own
+ * imported thread). "Koda never acts on its own" stays structural. Adapters
+ * never touch token storage — callers inject a valid access token.
  */
 
 export interface NormalizedEventAttendee {
@@ -89,9 +92,10 @@ export interface MailPullResult {
 
 /**
  * Mail access is split into a pull side (searchThreads, used by sync) and
- * ONE explicitly user-approved write: createDraft. Drafts are the hard
- * ceiling — there is deliberately no send method on this interface, so no
- * code path in Koda can dispatch an email.
+ * two explicitly user-approved writes: createDraft and sendMessage. Both are
+ * invoked exclusively by their explicit-click routes; sendMessage sends the
+ * user-approved text verbatim, once, with claim-first idempotency enforced
+ * by the route. Nothing autonomous can reach either method.
  */
 export interface MailSource {
   searchThreads(input: {
@@ -106,6 +110,13 @@ export interface MailSource {
     body: string;
     threadId?: string;
   }): Promise<{ draftId: string }>;
+  sendMessage(input: {
+    accessToken: string;
+    to: string;
+    subject: string;
+    body: string;
+    threadId?: string;
+  }): Promise<{ messageId: string }>;
 }
 
 /** Thrown by token/refresh code when the user must reconnect the provider. */

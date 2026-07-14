@@ -55,8 +55,9 @@ export function ConnectPrompt({ recruitingStage }: { recruitingStage: string | n
         </p>
         <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{reason}</p>
         <p className="mt-1 font-system text-muted-foreground">
-          Read-only. Koda never sends email or creates events. Disconnect anytime
-          and Koda deletes everything it imported.
+          Read-only. Koda never creates or changes calendar events, and never
+          acts without you. Disconnect anytime and Koda deletes everything it
+          imported.
         </p>
         <div className="mt-3">
           <a

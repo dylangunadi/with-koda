@@ -1,5 +1,7 @@
 # Koda Sprint Plan: Integration & Agentic Action Foundation
 
+> Historical plan. The "no send path exists" invariant below was deliberately superseded on 2026-07-14 by the explicit per-message Send rule (see docs/PRODUCT.md): sending exists, but only via the explicit per-move button, deterministic, claim-first idempotent, never autonomous.
+
 ## Context
 
 Koda today is a complete but self-contained loop: conversational onboarding builds a structured profile, Koda generates 3-move briefs (manual "Run Koda" + daily cron), users act on move cards, and feedback flows into future generations. But every move is `ai_suggested` — grounded only in what the user typed. This sprint builds the integration and agentic-action foundation (Google Calendar first, verified job boards second, Gmail architecture prepared for next sprint) so Koda's moves become grounded in real meetings, real people the user actually knows, and real live job postings — turning Koda from a good onboarding experience into an opportunity-to-action agent. The target feeling: *"I was away, Koda worked, and I came back to grounded moves, drafts, and prep briefs ready for review."*

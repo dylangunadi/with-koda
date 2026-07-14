@@ -123,7 +123,7 @@ export function ReviewConfirm({ extracted, onDone }: ReviewConfirmProps) {
         <p className="mt-1 text-sm text-muted-foreground">
           Fix anything that is off. Koda uses this to pick who you should talk
           to, what to send, and what to do next; it stays private to you, and
-          Koda never contacts anyone on your behalf.
+          Koda never contacts anyone unless you press Send on a specific message.
         </p>
       </div>
 

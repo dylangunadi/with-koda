@@ -2,13 +2,14 @@ import { test, expect } from "@playwright/test";
 import { adminClient, seedOnboardedUser } from "./helpers/db";
 import { loginViaUi } from "./helpers/auth";
 
-test("@critical move actions persist, calibrate effort, and there is no Send action", async ({
+test("@critical move actions persist, calibrate effort, and the API rejects a client-set 'sent' status", async ({
   page,
 }) => {
   const { user, moves } = await seedOnboardedUser("actions");
   await loginViaUi(page, user.email);
 
-  // No send affordance anywhere: nothing may claim external action.
+  // Seeded moves are not thread-grounded, so no Send affordance renders here:
+  // sending exists only on Gmail-grounded moves (see gmail-integration spec).
   await expect(page.getByRole("button", { name: /^Sent$/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Send$/ })).toHaveCount(0);
   // The dominant CTA is completion, not acceptance.

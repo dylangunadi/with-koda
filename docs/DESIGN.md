@@ -84,7 +84,7 @@
 - No jargon or corporate language
 - No em dashes in user-facing copy
 - Banned phrases (from prompts): "circling back", "touching base", "bandwidth", "leverage"
-- Never imply an external action happened: there is no "Send"/"Sent" anywhere; accepting a move means intent, completing means the user did it themselves
+- Never imply an external action happened that did not: "Sent via Gmail" appears only when the server recorded a real send (gmail_sent_at + message id); nothing else may claim Send/Sent
 - Label AI provenance honestly: move cards show a mono source line ("From what you told Koda" / "Inferred from your profile" / "Koda's suggestion") with confidence and effort
 
 ### Destructive Actions

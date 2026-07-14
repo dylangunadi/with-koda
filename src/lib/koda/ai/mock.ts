@@ -388,7 +388,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       company: null,
       person: counterpart,
       fit_reason: `This thread is sitting in your inbox with the last word from ${counterpart}. Recruiting conversations go cold fast; a same-week reply keeps this one alive.`,
-      suggested_action: `Edit the draft below and reply to ${counterpart} today. You send it yourself; Koda never sends anything.`,
+      suggested_action: `Edit the draft below and reply to ${counterpart} today, from the card's Send button or from Gmail.`,
       outreach_draft: `Hi ${counterpart}, thanks for the note! Yes, I would love to find time this week. I am generally free in the afternoons; happy to work around your calendar. Looking forward to it.`,
       proof_of_work_idea: "",
       follow_up_timing: "Reply today; nudge once more in 4 days if it stays quiet.",

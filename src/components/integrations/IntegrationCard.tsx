@@ -35,7 +35,7 @@ const SERVICE_COPY = {
     connectLabel: "Connect Gmail",
     reconnectLabel: "Reconnect Gmail",
     description:
-      "Koda imports only threads matching your recruiting search (subjects, senders, and previews; never full mailbox contents), spots conversations waiting on your reply, and prepares reply drafts. Creating a Gmail draft happens only when you click it on a move, and Koda can never send email.",
+      "Koda imports only threads matching your recruiting search (subjects, senders, and previews; never full mailbox contents), spots conversations waiting on your reply, and prepares reply drafts. Creating a Gmail draft or sending a reply happens only when you press that button on a specific message. Koda never sends on its own.",
     reconnectNote:
       "Google needs you to sign in again to keep syncing. Your data is untouched, and reconnecting resumes where it left off.",
     disconnectTitle: "Disconnect Gmail?",

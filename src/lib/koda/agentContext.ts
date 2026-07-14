@@ -199,7 +199,9 @@ function extractFeedbackPatterns(
   const accepted = moves.filter((m) => m.status === "accepted");
   const rejected = moves.filter((m) => m.status === "rejected");
   const saved = moves.filter((m) => m.status === "saved");
-  const sent = moves.filter((m) => m.status === "sent");
+  // Real sends (explicit Gmail send route sets gmail_sent_at) plus legacy
+  // 'sent'-status rows from before the Send action was removed and rebuilt.
+  const sent = moves.filter((m) => m.gmail_sent_at || m.status === "sent");
   const editedEvents = events.filter((e) => e.event_type === "edited");
 
   // Types the user acted on: accepted, completed, or legacy sent all signal

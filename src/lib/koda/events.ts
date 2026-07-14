@@ -49,7 +49,9 @@ export type KodaEventName =
   | "integrations_prompt_dismissed"
   | "job_board_added"
   | "job_board_removed"
-  | "gmail_draft_created";
+  | "gmail_draft_created"
+  | "gmail_message_sent"
+  | "linkedin_outreach_copied";
 
 export function logKodaEvent(
   supabase: SupabaseClient,

@@ -13,9 +13,9 @@ export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
 ];
 
-// gmail.readonly imports thread metadata; gmail.compose allows creating
-// DRAFTS on explicit user action. Neither permits sending on its own, and
-// Koda has no code path that calls send.
+// gmail.readonly imports thread metadata; gmail.compose covers draft
+// creation AND the explicit per-move send. gmail.modify is deliberately not
+// requested: compose is the narrowest grant that covers both writes.
 export const GMAIL_SCOPES = [
   "openid",
   "https://www.googleapis.com/auth/userinfo.email",

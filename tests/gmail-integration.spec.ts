@@ -54,9 +54,7 @@ test("gmail connect imports threads and grounds a reply move with draft creation
     /mail\.google\.com/
   );
 
-  // Explicit-approval draft creation: lands in Drafts, never sends. No Send
-  // affordance exists anywhere on the card.
-  await expect(replyCard.getByRole("button", { name: /^Send/ })).toHaveCount(0);
+  // Explicit-approval draft creation: lands in Drafts.
   await replyCard.getByRole("button", { name: "Create Gmail draft" }).click();
   await expect(page.getByText("Draft saved to your Gmail")).toBeVisible({ timeout: 15000 });
 
@@ -66,6 +64,63 @@ test("gmail connect imports threads and grounds a reply move with draft creation
     .eq("user_id", user.id)
     .eq("event_name", "gmail_draft_created");
   expect(draftEvents).toHaveLength(1);
+
+  // A forced provider failure (test-only header) fires before the
+  // idempotency claim: nothing is marked sent, so a retry stays possible.
+  const { data: pendingMove } = await db
+    .from("recruiting_moves")
+    .select("id")
+    .eq("user_id", user.id)
+    .not("external_thread_id", "is", null)
+    .single();
+  const forced = await page.request.post("/api/integrations/gmail/send", {
+    headers: { "x-koda-test-integration": "fail" },
+    data: { move_id: pendingMove!.id },
+  });
+  expect(forced.status()).toBe(502);
+  const { data: afterForced } = await db
+    .from("recruiting_moves")
+    .select("gmail_sent_at")
+    .eq("id", pendingMove!.id)
+    .single();
+  expect(afterForced!.gmail_sent_at).toBeNull();
+
+  // Explicit send: the confirm dialog shows the server's own preview of
+  // exactly what will go out, and sending happens once on confirm.
+  await replyCard.getByRole("button", { name: "Send via Gmail" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("jamie.wu@stripe.com")).toBeVisible({ timeout: 15000 });
+  await expect(dialog.getByText("Re: APM application at Stripe")).toBeVisible();
+  await dialog.getByRole("button", { name: "Send via Gmail" }).click();
+  await expect(page.getByText("Sent from your Gmail.")).toBeVisible({ timeout: 15000 });
+
+  const { data: sentMove } = await db
+    .from("recruiting_moves")
+    .select("id, status, gmail_sent_at, gmail_message_id")
+    .eq("user_id", user.id)
+    .not("gmail_sent_at", "is", null)
+    .single();
+  expect(sentMove!.status).toBe("completed");
+  expect(sentMove!.gmail_message_id).toBe("mock-sent-1");
+
+  const { data: sentEvents } = await db
+    .from("move_events")
+    .select("event_type")
+    .eq("move_id", sentMove!.id)
+    .eq("event_type", "sent");
+  expect(sentEvents).toHaveLength(1);
+  const { data: sentKodaEvents } = await db
+    .from("koda_events")
+    .select("event_name")
+    .eq("user_id", user.id)
+    .eq("event_name", "gmail_message_sent");
+  expect(sentKodaEvents).toHaveLength(1);
+
+  // Idempotency: a second send attempt is refused, never a second email.
+  const again = await page.request.post("/api/integrations/gmail/send", {
+    data: { move_id: sentMove!.id },
+  });
+  expect(again.status()).toBe(409);
 
   // Disconnect deletes every imported thread; the move keeps its copied
   // permalink as history with the live link nulled. Gmail is this user's

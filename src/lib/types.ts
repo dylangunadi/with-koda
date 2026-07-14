@@ -26,8 +26,10 @@ export interface Profile {
   updated_at: string;
 }
 
-// 'sent' is a legacy status kept for existing rows; the UI and API no longer
-// accept it (Koda has no sending integration, so nothing may claim "sent").
+// 'sent' is a legacy status kept for existing rows; the API still rejects it
+// as a client-set value. Real sends are recorded server-side by the explicit
+// Gmail send route via gmail_sent_at + gmail_message_id (the move itself
+// moves to 'completed'), so no client can merely claim a message went out.
 export type MoveStatus = "generated" | "accepted" | "rejected" | "sent" | "saved" | "completed";
 
 // 'verified' means the move is backed by a live external record (calendar
@@ -80,6 +82,9 @@ export interface RecruitingMove {
   external_thread_id: string | null;
   source_url: string | null;
   source_fetched_at: string | null;
+  /** Set exclusively by the explicit Gmail send route (claim-first). */
+  gmail_sent_at: string | null;
+  gmail_message_id: string | null;
   created_at: string;
   updated_at: string;
 }

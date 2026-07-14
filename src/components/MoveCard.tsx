@@ -6,7 +6,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Check, CheckCheck, ChevronDown, ChevronUp, Mail, Save, Bookmark, X } from "lucide-react";
+import { Check, CheckCheck, ChevronDown, ChevronUp, Mail, Save, Bookmark, Send, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { EffortBucket, MoveSourceStatus, MoveType, RecruitingMove } from "@/lib/types";
 
 // Category color lives only in this small text label; cards stay neutral.
@@ -63,6 +71,12 @@ export function MoveCard({
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [creatingDraft, setCreatingDraft] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendPreview, setSendPreview] = useState<{
+    recipient: string;
+    subject: string;
+    body: string;
+  } | null>(null);
   const [collecting, setCollecting] = useState<"effort" | "feedback" | null>(null);
   const [feedback, setFeedback] = useState("");
   const router = useRouter();
@@ -109,19 +123,68 @@ export function MoveCard({
     if (ok) setCollecting(null);
   }
 
-  // The one integration write in the product, and it happens only on this
-  // click: a DRAFT in the user's own Gmail, which they review and send
-  // themselves. Nothing is sent, and no Send affordance exists.
+  // Gmail writes happen only on these explicit clicks. Draft: lands in the
+  // user's Drafts folder. Send: opens a confirm dialog whose contents come
+  // from the server's dry run, so the user approves exactly what will be
+  // sent — deterministic, once, never on Koda's own initiative.
+  async function saveDraftIfDirty() {
+    if (draft !== move.outreach_draft) {
+      await fetch(`/api/moves/${move.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outreach_draft: draft }),
+      });
+    }
+  }
+
+  async function prepareSend() {
+    setSending(true);
+    try {
+      await saveDraftIfDirty();
+      const res = await fetch("/api/integrations/gmail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ move_id: move.id, dry_run: true }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(body.error ?? "Could not prepare the send.");
+        return;
+      }
+      setSendPreview({ recipient: body.recipient, subject: body.subject, body: body.body });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function confirmSend() {
+    setSending(true);
+    try {
+      const res = await fetch("/api/integrations/gmail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ move_id: move.id }),
+      });
+      if (res.status === 409) {
+        toast.message("Already sent. Refresh to see it.");
+      } else if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Send failed. Nothing went out.");
+        return;
+      } else {
+        toast.success("Sent from your Gmail.");
+      }
+      setSendPreview(null);
+      router.refresh();
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function createGmailDraft() {
     setCreatingDraft(true);
     try {
-      if (draft !== move.outreach_draft) {
-        await fetch(`/api/moves/${move.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ outreach_draft: draft }),
-        });
-      }
+      await saveDraftIfDirty();
       const res = await fetch("/api/integrations/gmail/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -304,30 +367,48 @@ export function MoveCard({
                 aria-label="Outreach draft"
                 className="text-sm rounded-lg"
               />
-              <div className="flex justify-end gap-2">
-                {gmailConnected && move.external_thread_id && !completed && (
+              {move.gmail_sent_at ? (
+                <p className="font-system text-muted-foreground flex items-center gap-1.5">
+                  <Check className="size-3.5" aria-hidden />
+                  Sent via Gmail · {new Date(move.gmail_sent_at).toLocaleString()}
+                </p>
+              ) : (
+                <div className="flex justify-end gap-2">
+                  {gmailConnected && move.external_thread_id && !completed && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={createGmailDraft}
+                        disabled={creatingDraft || sending || !draft.trim()}
+                        className="rounded-lg"
+                      >
+                        <Mail className="size-3.5" aria-hidden />
+                        <span>{creatingDraft ? "Creating..." : "Create Gmail draft"}</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={prepareSend}
+                        disabled={sending || creatingDraft || !draft.trim()}
+                        className="rounded-lg bg-primary font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
+                      >
+                        <Send className="size-3.5" aria-hidden />
+                        <span>{sending && !sendPreview ? "Preparing..." : "Send via Gmail"}</span>
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={createGmailDraft}
-                    disabled={creatingDraft || !draft.trim()}
+                    onClick={saveDraft}
+                    disabled={saving || draft === move.outreach_draft}
                     className="rounded-lg"
                   >
-                    <Mail className="size-3.5" aria-hidden />
-                    <span>{creatingDraft ? "Creating..." : "Create Gmail draft"}</span>
+                    <Save className="size-3.5" aria-hidden />
+                    <span>{saving ? "Saving..." : "Save draft"}</span>
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={saveDraft}
-                  disabled={saving || draft === move.outreach_draft}
-                  className="rounded-lg"
-                >
-                  <Save className="size-3.5" aria-hidden />
-                  <span>{saving ? "Saving..." : "Save draft"}</span>
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -344,6 +425,45 @@ export function MoveCard({
               <p className="text-sm leading-relaxed">{move.follow_up_timing}</p>
             </div>
           )}
+
+          <Dialog open={sendPreview !== null} onOpenChange={(open) => !open && setSendPreview(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Send this reply from your Gmail?</DialogTitle>
+                <DialogDescription>
+                  Koda will send exactly this text, once, from your Gmail.
+                  Nothing else is ever sent without this button.
+                </DialogDescription>
+              </DialogHeader>
+              {sendPreview && (
+                <div className="space-y-2 text-sm">
+                  <p>
+                    <span className="font-system text-muted-foreground">To </span>
+                    {sendPreview.recipient}
+                  </p>
+                  <p>
+                    <span className="font-system text-muted-foreground">Subject </span>
+                    {sendPreview.subject}
+                  </p>
+                  <div className="rounded-lg border border-border bg-background px-3 py-2 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                    {sendPreview.body}
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setSendPreview(null)} disabled={sending}>
+                  Keep editing
+                </Button>
+                <Button
+                  onClick={confirmSend}
+                  disabled={sending}
+                  className="bg-primary font-semibold text-primary-foreground hover:bg-[#075B59] transition-colors"
+                >
+                  {sending ? "Sending..." : "Send via Gmail"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <p className="font-system text-muted-foreground border-t border-border/40 pt-3">
             {move.source_status === "verified" ? (

@@ -121,7 +121,7 @@ with-koda/
 - Do not remove or weaken RLS policies
 - Do not bypass auth checks in API routes
 - Do not read or write `integration_tokens` outside `src/lib/koda/integrations/tokens.ts`, add policies/grants to that table, log token values, or import token/crypto modules into client components
-- Do not add any code path that sends messages, creates or edits calendar events, or performs outbound actions on a user's behalf — integration adapters stay pull-only
+- Do not add any code path that autonomously sends messages, creates or edits calendar events, or performs outbound actions. The only permitted outbound writes are the Gmail draft and the deterministic per-move Gmail send, each triggered exclusively by an explicit user click in a user-session route — never from cron, sync, or any AI-driven path
 
 ## Pull Request Expectations
 

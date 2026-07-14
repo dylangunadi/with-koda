@@ -31,7 +31,8 @@ All backend logic runs as Next.js API routes and server actions:
 | `/api/integrations/google/disconnect` | POST | User | Revoke at Google (best-effort) and delete the integration; cascade removes tokens, sync runs, imported events |
 | `/api/integrations/sync` | POST | User | Manual "Sync now" (2-minute rate limit) |
 | `/api/integrations/boards` | POST/DELETE | User | Add (validated with a live fetch) or remove a public Greenhouse/Lever board |
-| `/api/integrations/gmail/draft` | POST | User | Create a Gmail DRAFT from a thread-grounded move on explicit user click (requires gmail.compose; no send path exists) |
+| `/api/integrations/gmail/draft` | POST | User | Create a Gmail DRAFT from a thread-grounded move on explicit user click (requires gmail.compose) |
+| `/api/integrations/gmail/send` | POST | User | Send a move's saved draft verbatim to the thread counterpart, once, after an explicit confirm (dry_run preview; claim-first idempotency on gmail_sent_at; deterministic, no LLM in the path) |
 | `/api/waitlist` | POST | Public | Waitlist signup |
 
 Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist reviewed profile, close conversation, generate first brief — idempotent); `saveProfile` in `src/app/onboarding/actions.ts` (profile fields only; never touches brief settings).
@@ -47,7 +48,7 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
 
 ## Integration Layer
 
-`src/lib/koda/integrations/` mirrors the AI provider pattern: adapter interfaces (`CalendarSource`, `OpportunitySource`, `MailSource`) with real implementations (Google Calendar via syncToken incremental sync with 410 full-resync fallback; Greenhouse/Lever public JSON boards) and deterministic mock twins selected by `KODA_INTEGRATIONS_MOCK=1` or missing Google credentials. Adapters have no send methods — `MailSource`'s only write is `createDraft`, invoked exclusively by the explicit per-move draft route — so "Koda never contacts anyone" is structural. Gmail import is scoped to a recruiting search query stored on the integration config (never a full-mailbox scan), with `format=metadata` (headers + provider snippet, no bodies).
+`src/lib/koda/integrations/` mirrors the AI provider pattern: adapter interfaces (`CalendarSource`, `OpportunitySource`, `MailSource`) with real implementations (Google Calendar via syncToken incremental sync with 410 full-resync fallback; Greenhouse/Lever public JSON boards) and deterministic mock twins selected by `KODA_INTEGRATIONS_MOCK=1` or missing Google credentials. `MailSource` carries exactly two writes — `createDraft` and `sendMessage` — each invoked exclusively by its explicit per-move route on a user click; sync, cron, and AI-driven code cannot reach them, so "Koda never acts on its own" stays structural. Gmail import is scoped to a recruiting search query stored on the integration config (never a full-mailbox scan), with `format=metadata` (headers + provider snippet, no bodies).
 
 - **Tokens**: AES-256-GCM at rest (`crypto.ts`), lifecycle in `tokens.ts` (server-only; refresh at <120s to expiry; `invalid_grant` flips the integration to a calm "reconnect needed" state). Tokens are never logged and never readable outside the service role.
 - **Sync engine** (`sync.ts`): claim-first idempotency via the sync-runs unique index (mirrors the briefs cron); upserts normalized records on dedup keys; job-board postings absent from a fetch are marked `closed`, never silently deleted; per-integration failure isolation.
@@ -134,7 +135,7 @@ scripts/           — Dev, validation, and review scripts
 
 ### Move Actions
 1. User clicks Accept move / Mark completed / Save for later / Not relevant → `PATCH /api/moves/[id]`
-2. Route validates UUID and status (`sent` rejected — no sending integration exists), updates via RLS, records `move_events` and a `koda_events` product event
+2. Route validates UUID and status (`sent` rejected as a client-set value — real sends are recorded only by the explicit send route), updates via RLS, records `move_events` and a `koda_events` product event
 
 ## Deployment
 
@@ -162,5 +163,6 @@ Preview-scoped Vercel variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABA
 - **No error monitoring**: No Sentry or equivalent; errors go to console
 - **No rate limiting infrastructure**: Move generation rate limit is per-user DB query, not middleware-level
 - **koda_events RLS**: browsers could insert events directly for their own user, bypassing the `/api/events` whitelist (self-pollution only)
+- **gmail_sent_at self-set**: RLS lets a user UPDATE their own move rows directly, so a user could self-mark `gmail_sent_at` via supabase-js (self-pollution only; the send route's claim-first check then refuses to send, which is the safe direction)
 - **resume_text/experience_summary duplication**: Both fields populated from same onboarding input
 - **Live provider unverified in CI/sandbox**: environments without an `ANTHROPIC_API_KEY` exercise only the offline provider
