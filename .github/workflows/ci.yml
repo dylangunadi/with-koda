@@ -2,14 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
@@ -22,11 +22,39 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Full local Supabase stack with every repo migration applied, so the
+      # browser suite runs against a real database on every branch push.
+      - name: Start local Supabase
+        run: supabase start
+
+      # tests/helpers/env.ts and the dev server both read .env.local. The
+      # encryption key is the same non-secret test key pinned in
+      # playwright.config.ts; it protects nothing outside this ephemeral DB.
+      - name: Write .env.local from the local stack
+        run: |
+          eval "$(supabase status -o env)"
+          cat > .env.local <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=$API_URL
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
+          SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
+          KODA_AI_MOCK=1
+          KODA_INTEGRATIONS_MOCK=1
+          KODA_TOKEN_ENC_KEY=VGhpc0lzQTMyQnl0ZVRlc3RPbmx5S2V5Rm9yS29kYSE=
+          CRON_SECRET=ci-cron-secret
+          EOF
+
       - name: Lint
         run: npm run lint
 
       - name: Type-check
         run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm run test:unit
 
       - name: Build
         run: npm run build

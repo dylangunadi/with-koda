@@ -207,6 +207,9 @@ function sanitizeMove(move: Record<string, unknown>): GeneratedMove {
     // Cited ref only; whether it resolves to a real record (and whether
     // "verified" survives) is decided in grounding.ts, never here.
     source_ref: move.source_ref ? String(move.source_ref).trim().slice(0, 12) : null,
+    // Deterministic cap regardless of model behavior: LinkedIn rejects
+    // invites over 300 characters.
+    connection_note: String(move.connection_note || "").slice(0, 300),
   };
 }
 

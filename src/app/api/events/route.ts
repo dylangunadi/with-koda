@@ -9,9 +9,12 @@ const CLIENT_EVENTS: Record<string, string[]> = {
   voice_permission_denied: [],
   // Perceived latency: ms from submit to first visible reply text, and total.
   turn_latency: ["first_delta_ms", "total_ms", "mode"],
+  // Which LinkedIn outreach text was copied to the clipboard (enum only).
+  linkedin_outreach_copied: ["field"],
 };
 const ENUM_PROPS: Record<string, string[]> = {
   mode: ["onboarding", "ongoing"],
+  field: ["note", "message"],
 };
 
 export async function POST(request: Request) {

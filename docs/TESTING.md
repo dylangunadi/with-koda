@@ -44,7 +44,8 @@ In environments that cannot download the pinned Chromium build, point at a cache
 | `tests/integrations-connect.spec.ts` | @critical — mock-OAuth connect stores encrypted tokens an authed client cannot read (RLS proof); consent cancel writes nothing; disconnect cascades tokens and imported events |
 | `tests/integrations-sync.spec.ts` | Sync cron secret rejection and per-day idempotency; forced manual-sync failure recorded without crashing; rate limit; reconnect-needed UI state |
 | `tests/grounded-moves.spec.ts` | @critical — calendar-grounded move with Verified badge and live source link; completion prevents duplicate moves for the same event; board-grounded opportunity move; board removal deletes imports; no-integration users unchanged |
-| `tests/gmail-integration.spec.ts` | @critical — mock Gmail connect imports query-scoped threads with correct needs-reply state; grounded reply move; explicit-click Gmail draft creation (no Send affordance); disconnect deletes threads |
+| `tests/gmail-integration.spec.ts` | @critical — mock Gmail connect imports query-scoped threads with correct needs-reply state; grounded reply move; draft creation; explicit Send flow (server-preview confirm dialog, sent state, 409 on resend, forced failure leaves nothing claimed); disconnect deletes threads |
+| `tests/linkedin-outreach.spec.ts` | LinkedIn assisted outreach: URL validation, 300-char note cap, copy events, persistence, and no automation affordance |
 | `tests/helpers/` | `env.ts` (.env.local parsing), `db.ts` (service-role seeding/assertions, refuses non-local Supabase), `auth.ts` (UI login/signup) |
 
 ## Test Data

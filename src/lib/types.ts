@@ -85,6 +85,10 @@ export interface RecruitingMove {
   /** Set exclusively by the explicit Gmail send route (claim-first). */
   gmail_sent_at: string | null;
   gmail_message_id: string | null;
+  /** User-pasted profile URL; Koda never looks people up on LinkedIn. */
+  person_linkedin_url: string | null;
+  /** Short LinkedIn connection-invite note (LinkedIn caps invites at 300). */
+  connection_note: string | null;
   created_at: string;
   updated_at: string;
 }

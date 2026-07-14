@@ -140,6 +140,7 @@ function makeMove(overrides: Partial<GeneratedMove> = {}): GeneratedMove {
     expected_outcome: "",
     source_status: "ai_suggested",
     source_ref: null,
+    connection_note: "",
     ...overrides,
   };
 }

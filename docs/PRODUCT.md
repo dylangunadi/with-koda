@@ -52,7 +52,7 @@ Students without inherited recruiting networks struggle to identify who to conta
 - Koda does not apply to jobs on behalf of users
 - Koda never sends autonomously. The only send is the explicit per-message button (deterministic, no LLM in the path, confirmed against the server's own preview); the API still rejects any client-set `sent` status, so nothing can merely claim a message went out
 - Koda does not invent people, openings, or research; move sources are labeled, and "verified" is unforgeable (server-side ref resolution)
-- Koda never scans a mailbox, scrapes LinkedIn, or automates any outbound action; integrations are pull-only by construction
+- Koda never scans a mailbox, never scrapes LinkedIn, and never automates LinkedIn actions (assisted outreach is copy-paste only; see docs/LINKEDIN_AUTOMATION.md for the researched decision)
 - No social auth (Google, GitHub, etc.) currently — Google OAuth exists only as the Calendar data integration
 
 ## Product Uncertainties (need Dylan's confirmation)

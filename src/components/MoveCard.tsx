@@ -77,6 +77,9 @@ export function MoveCard({
     subject: string;
     body: string;
   } | null>(null);
+  const [linkedinUrl, setLinkedinUrl] = useState(move.person_linkedin_url ?? "");
+  const [note, setNote] = useState(move.connection_note ?? "");
+  const [savingLinkedin, setSavingLinkedin] = useState(false);
   const [collecting, setCollecting] = useState<"effort" | "feedback" | null>(null);
   const [feedback, setFeedback] = useState("");
   const router = useRouter();
@@ -199,6 +202,43 @@ export function MoveCard({
       router.refresh();
     } finally {
       setCreatingDraft(false);
+    }
+  }
+
+  // LinkedIn outreach is copy-paste only: Koda never connects or messages on
+  // LinkedIn. The user pastes the profile URL, copies the text, and acts
+  // there themselves.
+  async function saveLinkedin() {
+    setSavingLinkedin(true);
+    try {
+      const res = await fetch(`/api/moves/${move.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ person_linkedin_url: linkedinUrl.trim(), connection_note: note }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Could not save");
+        return;
+      }
+      toast.success("Saved");
+      router.refresh();
+    } finally {
+      setSavingLinkedin(false);
+    }
+  }
+
+  async function copyOutreach(field: "note" | "message", text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(field === "note" ? "Connection note copied" : "Message copied");
+      void fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "linkedin_outreach_copied", properties: { field } }),
+      });
+    } catch {
+      toast.error("Could not copy. Select the text manually.");
     }
   }
 
@@ -409,6 +449,84 @@ export function MoveCard({
                   </Button>
                 </div>
               )}
+            </div>
+          )}
+
+          {move.type === "person_to_contact" && !completed && (
+            <div className="space-y-2">
+              <p className="font-system text-muted-foreground">LinkedIn outreach</p>
+              <div className="flex gap-2">
+                <Input
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="Paste their LinkedIn profile URL"
+                  aria-label="LinkedIn profile URL"
+                  className="h-9 rounded-lg text-sm"
+                />
+                {move.person_linkedin_url && (
+                  <a
+                    href={move.person_linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-9 shrink-0 items-center rounded-lg border border-border px-3 text-sm hover:bg-muted transition-colors"
+                  >
+                    Open profile ↗
+                  </a>
+                )}
+              </div>
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={3}
+                aria-label="LinkedIn connection note"
+                placeholder="Connection note (goes with the invite)"
+                className="text-sm rounded-lg"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`font-system ${note.length > 300 ? "text-red-600" : "text-muted-foreground"}`}
+                >
+                  {note.length}/300
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => copyOutreach("note", note)}
+                    disabled={!note.trim()}
+                    className="text-muted-foreground"
+                  >
+                    Copy note
+                  </Button>
+                  {draft.trim() && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyOutreach("message", draft)}
+                      className="text-muted-foreground"
+                    >
+                      Copy message
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={saveLinkedin}
+                    disabled={
+                      savingLinkedin ||
+                      note.length > 300 ||
+                      (linkedinUrl.trim() === (move.person_linkedin_url ?? "") &&
+                        note === (move.connection_note ?? ""))
+                    }
+                    className="rounded-lg"
+                  >
+                    {savingLinkedin ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+              <p className="font-system text-muted-foreground">
+                Koda never connects or messages on LinkedIn. You paste this yourself.
+              </p>
             </div>
           )}
 

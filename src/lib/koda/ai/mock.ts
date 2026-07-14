@@ -353,6 +353,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
             expected_outcome: "You show up prepared and memorable instead of generic.",
             source_status: "verified",
             source_ref: eventRef.ref,
+            connection_note: "",
           }
         : {
             title: `Send a follow-up for "${eventTitle}"`,
@@ -372,6 +373,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
             expected_outcome: "The relationship stays warm while the conversation is fresh.",
             source_status: "verified",
             source_ref: eventRef.ref,
+            connection_note: "",
           }
     );
   }
@@ -400,6 +402,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       expected_outcome: "The conversation moves forward instead of going cold.",
       source_status: "verified",
       source_ref: threadRef.ref,
+      connection_note: "",
     });
   }
 
@@ -423,6 +426,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       expected_outcome: "A real application in flight at a company you actually named.",
       source_status: "verified",
       source_ref: oppRef.ref,
+      connection_note: "",
     });
   }
 
@@ -447,6 +451,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       expected_outcome: "One warm conversation scheduled with someone you already know.",
       source_status: "user_provided",
       source_ref: null,
+      connection_note: `Hi! We know each other through ${contacts.slice(0, 60) || "school"}. I am exploring ${role} work right now and would love to reconnect for 15 minutes.`.slice(0, 300),
     });
   } else {
     moves.push({
@@ -467,6 +472,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
       expected_outcome: "One real conversation started at a stated target company.",
       source_status: "ai_suggested",
       source_ref: null,
+      connection_note: `Hi! I am ${name}, working toward ${role} roles, and ${company} is at the top of my list. Would love to connect and ask a couple of quick questions about your path.`.slice(0, 300),
     });
   }
 
@@ -495,6 +501,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
     expected_outcome: "A linkable artifact that upgrades every application and message you send.",
     source_status: proof ? "inferred" : "ai_suggested",
     source_ref: null,
+    connection_note: "",
   });
 
   // 3. Strategy move grounded in stated stage and timeline.
@@ -516,6 +523,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
     expected_outcome: "A two-week plan matched to your stated deadline, so effort lands where you said it matters.",
     source_status: "inferred",
     source_ref: null,
+    connection_note: "",
   });
 
   // Never repeat a title the user already has (cheap dedupe for regeneration),

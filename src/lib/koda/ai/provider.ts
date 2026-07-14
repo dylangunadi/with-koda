@@ -21,6 +21,9 @@ export interface GeneratedMove {
   /** Ref id ("EV1", "OP2") of the verified external item this move is built
    * on; resolved and enforced server-side in grounding.ts. */
   source_ref: string | null;
+  /** person_to_contact moves: a LinkedIn connection-invite note, hard-capped
+   * at 300 chars server-side (LinkedIn's invite limit). Empty otherwise. */
+  connection_note: string;
 }
 
 export interface OnboardingTurnInput {

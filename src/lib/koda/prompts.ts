@@ -133,6 +133,7 @@ Each object must have these exact keys:
 - expected_outcome: string (what completing this move actually gets the student)
 - source_status: one of "user_provided" (built directly from facts the student stated), "inferred" (a reasonable conclusion from their profile), "ai_suggested" (your idea, not grounded in a specific stated fact), "verified" (built on a VERIFIED CALENDAR or VERIFIED OPENINGS item below)
 - source_ref: string or null — the exact ref id ("EV1", "OP2") of the VERIFIED item this move is built on. REQUIRED whenever source_status is "verified"; null otherwise.
+- connection_note: string (person_to_contact moves only: a LinkedIn connection-invite note in the student's voice, maximum 280 characters — LinkedIn caps invites at 300. Empty string for other move types.)
 
 GROUNDING: Use only facts from the student's profile and agent memory below. If a move rests on something the student did not state, its source_status must be "ai_suggested". Never present an invented opening, event, or person as if it were verified.
 

@@ -124,6 +124,7 @@ export async function GET(request: NextRequest) {
         external_event_id: move.external_event_id ?? null,
         external_opportunity_id: move.external_opportunity_id ?? null,
         external_thread_id: move.external_thread_id ?? null,
+        connection_note: move.connection_note || null,
         source_url: move.source_url ?? null,
         source_fetched_at: move.source_fetched_at ?? null,
         status: "generated" as const,

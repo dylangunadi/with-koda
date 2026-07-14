@@ -45,11 +45,20 @@ export async function PATCH(
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { status, outreach_draft, actual_effort_bucket, feedback } = body as {
+  const {
+    status,
+    outreach_draft,
+    actual_effort_bucket,
+    feedback,
+    person_linkedin_url,
+    connection_note,
+  } = body as {
     status?: string;
     outreach_draft?: string;
     actual_effort_bucket?: string;
     feedback?: string;
+    person_linkedin_url?: string;
+    connection_note?: string;
   };
 
   const VALID_BUCKETS = ["quick", "focused", "project"];
@@ -69,6 +78,38 @@ export async function PATCH(
       { error: `Outreach draft too long (max ${MAX_DRAFT_LENGTH} characters)` },
       { status: 400 }
     );
+  }
+
+  // LinkedIn connection notes are capped at LinkedIn's own invite limit.
+  if (connection_note !== undefined && (typeof connection_note !== "string" || connection_note.length > 300)) {
+    return NextResponse.json(
+      { error: "Connection note too long (max 300 characters)" },
+      { status: 400 }
+    );
+  }
+
+  // User-pasted profile URL only: https, linkedin.com hostnames. Empty
+  // string clears it. Koda never looks people up on LinkedIn itself.
+  if (person_linkedin_url !== undefined) {
+    if (typeof person_linkedin_url !== "string" || person_linkedin_url.length > 300) {
+      return NextResponse.json({ error: "Invalid LinkedIn URL" }, { status: 400 });
+    }
+    if (person_linkedin_url !== "") {
+      let parsed: URL;
+      try {
+        parsed = new URL(person_linkedin_url);
+      } catch {
+        return NextResponse.json({ error: "Invalid LinkedIn URL" }, { status: 400 });
+      }
+      const host = parsed.hostname.toLowerCase();
+      const isLinkedIn = host === "linkedin.com" || host.endsWith(".linkedin.com");
+      if (parsed.protocol !== "https:" || !isLinkedIn) {
+        return NextResponse.json(
+          { error: "That does not look like a LinkedIn profile URL" },
+          { status: 400 }
+        );
+      }
+    }
   }
 
   // Verify the move exists and belongs to the user (RLS enforces ownership)
@@ -107,6 +148,13 @@ export async function PATCH(
   // Actual effort arrives with completion and calibrates future estimates.
   if (actual_effort_bucket !== undefined) {
     updates.actual_effort_bucket = actual_effort_bucket;
+  }
+
+  if (connection_note !== undefined) {
+    updates.connection_note = connection_note;
+  }
+  if (person_linkedin_url !== undefined) {
+    updates.person_linkedin_url = person_linkedin_url === "" ? null : person_linkedin_url;
   }
 
   const { data: updated, error: updateError } = await supabase
