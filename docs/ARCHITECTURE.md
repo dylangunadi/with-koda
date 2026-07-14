@@ -21,7 +21,7 @@ All backend logic runs as Next.js API routes and server actions:
 | `/api/events` | POST | User | Whitelisted client-originated product events |
 | `/api/moves` | GET | User | List moves (optional status filter) |
 | `/api/moves/generate` | POST | User | Generate a manual brief (3 moves) via the AI provider |
-| `/api/moves/[id]` | PATCH | User | Update move status or outreach draft (`sent` rejected) |
+| `/api/moves/[id]` | PATCH | User | Update move status, outreach draft, LinkedIn URL, or connection note (`sent` rejected as a client-set value) |
 | `/api/briefs` | POST | User | Scheduled-brief consent and email-digest opt-in (sole writer of brief settings) |
 | `/api/briefs/confirm` | GET | Token | Email double-opt-in confirmation |
 | `/api/cron/brief` | GET | CRON_SECRET | Scheduled brief generation, idempotent per user per day |
