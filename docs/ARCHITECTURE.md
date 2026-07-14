@@ -83,7 +83,7 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
   - `external_opportunities` — job postings from public ATS boards with `verification_status` (verified_live | stale | closed), source URL, and fetch time
   - `external_threads` — Gmail thread metadata matched by the user's recruiting search query (subject, snippet, participants, needs_reply; bodies are never imported)
 - All tables have RLS policies scoping data to `auth.uid() = user_id` (exception: `integration_tokens`, deliberately service-role-only as above)
-- Migrations in `supabase/migrations/`. Known issue: the two `20260710_*` files sort against their dependency order; apply `koda_mvp_schema` before `koda_agentic_layer` on a fresh database.
+- Migrations in `supabase/migrations/`, full-timestamp filenames in dependency order (a fresh `supabase db reset`/`supabase start` applies them cleanly; CI does exactly this on every run). Environments that applied the pre-rename `20260710_*` versions need a one-time `supabase migration repair --status applied 20260710000000 20260710000001` before the next `db push`.
 - Cron endpoint uses service role key to bypass RLS
 
 ## Third-Party Integrations

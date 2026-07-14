@@ -95,7 +95,7 @@ Funnel rates: compare distinct-user counts of `onboarding_started`,
 
 ## Bugs
 
-- [ ] Pre-existing migration filename ordering: `20260710_koda_agentic_layer.sql` sorts before `20260710_koda_mvp_schema.sql` but depends on it, so a fresh `supabase db reset` fails. Apply in dependency order, or rename (renaming already-applied production migrations has its own risks).
+- [x] Pre-existing migration filename ordering: resolved by renaming to `20260710000000_koda_mvp_schema.sql` / `20260710000001_koda_agentic_layer.sql` (caught by the new CI's fresh `supabase start`). Hosted projects that applied the old names need a one-time `supabase migration repair --status applied 20260710000000 20260710000001`.
 
 ## Product Questions
 
