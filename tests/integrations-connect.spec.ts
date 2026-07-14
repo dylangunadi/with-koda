@@ -20,13 +20,14 @@ test("connect happy path stores encrypted tokens the browser can never read @cri
   await loginViaUi(page, user.email);
 
   await page.goto("/settings/integrations");
-  await expect(page.getByText("Not connected")).toBeVisible();
-  await page.getByRole("link", { name: "Connect Google Calendar" }).click();
+  const calendarCard = page.getByTestId("integration-google_calendar");
+  await expect(calendarCard.getByText("Not connected")).toBeVisible();
+  await calendarCard.getByRole("link", { name: "Connect Google Calendar" }).click();
 
   // Mock OAuth round-trips through the real callback and lands back here.
   await expect(page).toHaveURL(/\/settings\/integrations\?connect=ok/);
-  await expect(page.getByText("Connected", { exact: false })).toBeVisible();
-  await expect(page.getByText("Sample calendar (offline mode)")).toBeVisible();
+  await expect(calendarCard.getByText("Connected", { exact: false })).toBeVisible();
+  await expect(calendarCard.getByText("Sample calendar (offline mode)")).toBeVisible();
 
   // Integration row exists and the initial sync imported the mock events.
   const { data: integrations } = await db
@@ -108,7 +109,8 @@ test("disconnect deletes tokens and every imported event", async ({ page }) => {
   await loginViaUi(page, user.email);
 
   await page.goto("/settings/integrations");
-  await page.getByRole("link", { name: "Connect Google Calendar" }).click();
+  const calendarCard = page.getByTestId("integration-google_calendar");
+  await calendarCard.getByRole("link", { name: "Connect Google Calendar" }).click();
   await expect(page).toHaveURL(/connect=ok/);
 
   const { data: before } = await db
@@ -117,9 +119,11 @@ test("disconnect deletes tokens and every imported event", async ({ page }) => {
     .eq("user_id", user.id);
   expect(before!.length).toBeGreaterThan(0);
 
-  await page.getByRole("button", { name: "Disconnect" }).click();
+  await calendarCard.getByRole("button", { name: "Disconnect" }).click();
   await page.getByRole("button", { name: "Disconnect and delete data" }).click();
-  await expect(page.getByText("Not connected")).toBeVisible();
+  // Scoped to the calendar card so this waits for the calendar disconnect to
+  // land, not the (always disconnected) Gmail card — the delete is async.
+  await expect(calendarCard.getByText("Not connected")).toBeVisible();
 
   const { data: integrations } = await db
     .from("integrations")

@@ -113,7 +113,7 @@ export function IntegrationCard({
   }
 
   return (
-    <div>
+    <div data-testid={`integration-${provider}`}>
       <p className="font-system text-primary mb-3">{copy.heading}</p>
       <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">

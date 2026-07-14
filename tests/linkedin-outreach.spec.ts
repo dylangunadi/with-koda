@@ -36,12 +36,23 @@ test("linkedin outreach panel: URL validation, note cap, copy, and no automation
   await card.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved")).toBeVisible();
 
+  // Poll the row: tolerant of the router.refresh re-render that follows the
+  // PATCH, without masking a genuine non-persist (it still fails if null).
+  await expect
+    .poll(async () => {
+      const { data } = await db
+        .from("recruiting_moves")
+        .select("person_linkedin_url")
+        .eq("id", contactMove.id)
+        .single();
+      return data?.person_linkedin_url ?? null;
+    })
+    .toBe("https://www.linkedin.com/in/sam-notion");
   const { data: saved } = await db
     .from("recruiting_moves")
-    .select("person_linkedin_url, connection_note")
+    .select("connection_note")
     .eq("id", contactMove.id)
     .single();
-  expect(saved!.person_linkedin_url).toBe("https://www.linkedin.com/in/sam-notion");
   expect(saved!.connection_note).toContain("consulting club");
 
   await page.reload();
