@@ -34,13 +34,52 @@ jobs:
       # tests/helpers/env.ts and the dev server both read .env.local. The
       # encryption key is the same non-secret test key pinned in
       # playwright.config.ts; it protects nothing outside this ephemeral DB.
+      #
+      # Key handling is adaptive: newer CLI versions hand out new-format
+      # sb_secret_/sb_publishable_ keys that the data API rejects as bearer
+      # tokens, so we probe the reported service key against PostgREST and,
+      # if it fails, mint classic HS256 JWTs from the stack's JWT_SECRET and
+      # verify those instead. Either way the step fails loudly if no working
+      # service credential exists.
       - name: Write .env.local from the local stack
         run: |
+          set -euo pipefail
           eval "$(supabase status -o env)"
+
+          mint() {
+            node -e '
+              const c = require("crypto");
+              const secret = process.env.JWT_SECRET;
+              const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+              const header = b64({ alg: "HS256", typ: "JWT" });
+              const payload = b64({ role: process.argv[1], iss: "supabase-demo", iat: 1700000000, exp: 2100000000 });
+              const sig = c.createHmac("sha256", secret).update(header + "." + payload).digest("base64url");
+              console.log(header + "." + payload + "." + sig);
+            ' "$1"
+          }
+          works() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              "$API_URL/rest/v1/profiles?select=user_id&limit=1" \
+              -H "apikey: $1" -H "Authorization: Bearer $1")
+            [ "$code" = "200" ]
+          }
+
+          SERVICE_KEY="$SERVICE_ROLE_KEY"
+          ANON="$ANON_KEY"
+          if ! works "$SERVICE_KEY"; then
+            echo "Reported service key rejected by the data API; minting legacy JWTs from JWT_SECRET."
+            SERVICE_KEY=$(JWT_SECRET="$JWT_SECRET" mint service_role)
+            ANON=$(JWT_SECRET="$JWT_SECRET" mint anon)
+            if ! works "$SERVICE_KEY"; then
+              echo "No working service-role credential for the local stack." >&2
+              exit 1
+            fi
+          fi
+
           cat > .env.local <<EOF
           NEXT_PUBLIC_SUPABASE_URL=$API_URL
-          NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY
-          SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON
+          SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
           KODA_AI_MOCK=1
           KODA_INTEGRATIONS_MOCK=1
           KODA_TOKEN_ENC_KEY=VGhpc0lzQTMyQnl0ZVRlc3RPbmx5S2V5Rm9yS29kYSE=
