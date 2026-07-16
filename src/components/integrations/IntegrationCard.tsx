@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Calendar, Mail, RefreshCw, Unplug } from "lucide-react";
+import { RefreshCw, Unplug } from "lucide-react";
+import { GmailMark, GoogleCalendarMark } from "@/components/integrations/BrandMarks";
 import type { Integration, IntegrationSyncRun } from "@/lib/types";
 
 const SERVICE_COPY = {
@@ -118,12 +119,8 @@ export function IntegrationCard({
       <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-muted">
-              {provider === "gmail" ? (
-                <Mail className="size-4 text-muted-foreground" aria-hidden />
-              ) : (
-                <Calendar className="size-4 text-muted-foreground" aria-hidden />
-              )}
+            <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-white">
+              {provider === "gmail" ? <GmailMark /> : <GoogleCalendarMark />}
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">

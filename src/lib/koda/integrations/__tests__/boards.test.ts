@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseBoardUrl, slugifyCompany } from "../jobs/boards";
+import { parseBoardUrl, slugifyCompany, suggestBoardsForRoles } from "../jobs/boards";
 
 describe("slugifyCompany", () => {
   it("lowercases and strips punctuation", () => {
@@ -43,5 +43,28 @@ describe("parseBoardUrl", () => {
     expect(parseBoardUrl("https://example.com/careers", "X")).toBeNull();
     expect(parseBoardUrl("not a url", "X")).toBeNull();
     expect(parseBoardUrl("https://boards.greenhouse.io/", "X")).toBeNull();
+  });
+});
+
+describe("suggestBoardsForRoles", () => {
+
+  it("matches curated companies to target-role keywords", () => {
+    const out = suggestBoardsForRoles(["Product management"], new Set());
+    expect(out.length).toBeGreaterThan(0);
+    expect(out.every((s: { url: string }) => /greenhouse\.io|lever\.co/.test(s.url))).toBe(true);
+  });
+
+  it("excludes already-covered companies and respects the limit", () => {
+    const all = suggestBoardsForRoles(["software engineer"], new Set());
+    const excluded = suggestBoardsForRoles(
+      ["software engineer"],
+      new Set(all.map((s: { company: string }) => s.company.toLowerCase()))
+    );
+    expect(all.length).toBeLessThanOrEqual(6);
+    expect(excluded.some((s: { company: string }) => all.find((a: { company: string }) => a.company === s.company))).toBe(false);
+  });
+
+  it("returns nothing without target roles", () => {
+    expect(suggestBoardsForRoles([], new Set())).toEqual([]);
   });
 });

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { JobBoardsMark } from "@/components/integrations/BrandMarks";
 import type { Integration, JobBoardConfig } from "@/lib/types";
 
 /**
@@ -16,9 +17,12 @@ import type { Integration, JobBoardConfig } from "@/lib/types";
 export function JobBoardsManager({
   integration,
   targetCompanies,
+  roleSuggestions = [],
 }: {
   integration: Integration | null;
   targetCompanies: string[];
+  /** Curated companies (with board URLs) aligned to the user's target roles. */
+  roleSuggestions?: Array<{ company: string; url: string }>;
 }) {
   const router = useRouter();
   const boards: JobBoardConfig[] = integration?.config.boards ?? [];
@@ -27,11 +31,14 @@ export function JobBoardsManager({
   const [showUrlField, setShowUrlField] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const covered = new Set(boards.map((b) => b.company.trim().toLowerCase()));
   const suggestions = targetCompanies
-    .filter(
-      (c) => !boards.some((b) => b.company.trim().toLowerCase() === c.trim().toLowerCase())
-    )
+    .filter((c) => !covered.has(c.trim().toLowerCase()))
     .slice(0, 6);
+  const suggestionSet = new Set(suggestions.map((s) => s.trim().toLowerCase()));
+  const roleAligned = roleSuggestions.filter(
+    (s) => !covered.has(s.company.toLowerCase()) && !suggestionSet.has(s.company.toLowerCase())
+  );
 
   async function addBoard(companyName: string, url?: string) {
     if (!companyName.trim()) return;
@@ -85,8 +92,8 @@ export function JobBoardsManager({
       <p className="font-system text-primary mb-3">Job boards</p>
       <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex size-9 items-center justify-center rounded-lg bg-muted">
-            <Briefcase className="size-4 text-muted-foreground" aria-hidden />
+          <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-white">
+            <JobBoardsMark />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">
@@ -151,6 +158,29 @@ export function JobBoardsManager({
                 >
                   <Plus className="size-3.5" aria-hidden />
                   <span>{suggestion}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {roleAligned.length > 0 && (
+          <div className="space-y-2">
+            <p className="font-system text-muted-foreground">
+              Companies hiring for your target roles (public boards)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {roleAligned.map((entry) => (
+                <Button
+                  key={entry.company}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addBoard(entry.company, entry.url)}
+                  disabled={busy}
+                  className="rounded-lg"
+                >
+                  <Plus className="size-3.5" aria-hidden />
+                  <span>{entry.company}</span>
                 </Button>
               ))}
             </div>

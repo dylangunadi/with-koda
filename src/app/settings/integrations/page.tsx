@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { IntegrationCard } from "@/components/integrations/IntegrationCard";
 import { JobBoardsManager } from "@/components/integrations/JobBoardsManager";
+import { isIntegrationsMockMode } from "@/lib/koda/integrations/registry";
+import { suggestBoardsForRoles } from "@/lib/koda/integrations/jobs/boards";
 import type { Integration, IntegrationSyncRun } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +31,7 @@ export default async function IntegrationsSettingsPage({
     supabase.from("integrations").select("*").eq("user_id", user.id),
     supabase
       .from("profiles")
-      .select("target_companies")
+      .select("target_companies, target_roles")
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
@@ -55,6 +57,15 @@ export default async function IntegrationsSettingsPage({
     lastRun(gmail),
   ]);
 
+  const offlineMode = isIntegrationsMockMode();
+  const coveredCompanies = new Set(
+    (jobBoards?.config.boards ?? []).map((b) => b.company.toLowerCase())
+  );
+  const roleSuggestions = suggestBoardsForRoles(
+    profileRow?.target_roles ?? [],
+    coveredCompanies
+  );
+
   return (
     <div className="page-enter">
       <div className="mb-10">
@@ -74,6 +85,20 @@ export default async function IntegrationsSettingsPage({
           </Link>
         </p>
       </div>
+
+      {offlineMode && (
+        <div className="mb-6 rounded-xl border border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+          <p className="font-semibold">Offline sample mode</p>
+          <p className="mt-1 leading-relaxed">
+            Google credentials are not configured in this environment, so
+            Connect skips Google&apos;s consent screen and imports clearly
+            labeled sample data instead of your real calendar or inbox. To
+            connect real accounts, set GOOGLE_CLIENT_ID and
+            GOOGLE_CLIENT_SECRET and redeploy. Job boards use sample postings
+            only while KODA_INTEGRATIONS_MOCK is set.
+          </p>
+        </div>
+      )}
 
       {connect === "ok" && (
         <NoticeCard tone="ok" text="Connected. Koda pulled your data and will keep it fresh." />
@@ -97,6 +122,7 @@ export default async function IntegrationsSettingsPage({
         <JobBoardsManager
           integration={jobBoards}
           targetCompanies={profileRow?.target_companies ?? []}
+          roleSuggestions={roleSuggestions}
         />
       </div>
     </div>

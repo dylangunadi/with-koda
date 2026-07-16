@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Calendar, X } from "lucide-react";
+import { X } from "lucide-react";
+import { GoogleCalendarMark } from "@/components/integrations/BrandMarks";
 
 /**
  * Post-first-brief integration recommendation: one integration, goal-derived
@@ -46,8 +47,8 @@ export function ConnectPrompt({ recruitingStage }: { recruitingStage: string | n
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm px-5 py-4 flex items-start gap-3">
-      <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-        <Calendar className="size-4 text-muted-foreground" aria-hidden />
+      <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-white">
+        <GoogleCalendarMark />
       </div>
       <div className="min-w-0">
         <p className="text-sm font-semibold text-foreground">

@@ -62,6 +62,61 @@ export async function validateBoard(candidate: JobBoardConfig): Promise<boolean>
   }
 }
 
+/**
+ * Curated companies with public Greenhouse/Lever boards, tagged by the role
+ * families they regularly hire for. Used to suggest boards aligned with the
+ * student's target ROLES (not just their named companies). Every suggestion
+ * is still validated with a live fetch at add time, so a stale entry
+ * degrades to an honest "board did not respond", never fake data.
+ */
+export const CURATED_BOARDS: Array<{
+  company: string;
+  ats: "greenhouse" | "lever";
+  board_token: string;
+  roles: string[];
+}> = [
+  { company: "Stripe", ats: "greenhouse", board_token: "stripe", roles: ["product", "pm", "software", "engineer", "data", "finance"] },
+  { company: "Notion", ats: "greenhouse", board_token: "notion", roles: ["product", "pm", "software", "engineer", "design", "marketing"] },
+  { company: "Figma", ats: "greenhouse", board_token: "figma", roles: ["product", "pm", "software", "engineer", "design"] },
+  { company: "Airtable", ats: "greenhouse", board_token: "airtable", roles: ["product", "pm", "software", "engineer"] },
+  { company: "Databricks", ats: "greenhouse", board_token: "databricks", roles: ["software", "engineer", "data", "ml", "machine learning"] },
+  { company: "Duolingo", ats: "greenhouse", board_token: "duolingo", roles: ["product", "pm", "software", "engineer", "design", "data"] },
+  { company: "Robinhood", ats: "greenhouse", board_token: "robinhood", roles: ["product", "pm", "software", "engineer", "finance", "data"] },
+  { company: "Coinbase", ats: "greenhouse", board_token: "coinbase", roles: ["product", "pm", "software", "engineer", "finance"] },
+  { company: "Gusto", ats: "greenhouse", board_token: "gusto", roles: ["product", "pm", "software", "engineer"] },
+  { company: "Brex", ats: "greenhouse", board_token: "brex", roles: ["product", "pm", "software", "engineer", "finance"] },
+  { company: "Pinterest", ats: "greenhouse", board_token: "pinterest", roles: ["product", "pm", "software", "engineer", "data", "design"] },
+  { company: "Lyft", ats: "greenhouse", board_token: "lyft", roles: ["product", "pm", "software", "engineer", "data"] },
+  { company: "Ramp", ats: "lever", board_token: "ramp", roles: ["product", "pm", "software", "engineer", "finance", "data"] },
+  { company: "Plaid", ats: "lever", board_token: "plaid", roles: ["product", "pm", "software", "engineer", "finance"] },
+  { company: "Palantir", ats: "lever", board_token: "palantir", roles: ["software", "engineer", "data", "consulting", "strategy"] },
+  { company: "Scale AI", ats: "lever", board_token: "scaleai", roles: ["product", "pm", "software", "engineer", "ml", "machine learning", "data"] },
+];
+
+export function boardUrlFor(entry: { ats: "greenhouse" | "lever"; board_token: string }): string {
+  return entry.ats === "greenhouse"
+    ? `https://boards.greenhouse.io/${entry.board_token}`
+    : `https://jobs.lever.co/${entry.board_token}`;
+}
+
+/** Companies from the curated catalog whose role tags overlap the student's
+ * target roles, excluding companies already covered. */
+export function suggestBoardsForRoles(
+  targetRoles: string[],
+  excludeCompanies: Set<string>,
+  limit = 6
+): Array<{ company: string; url: string }> {
+  const roleText = targetRoles.join(" ").toLowerCase();
+  if (!roleText.trim()) return [];
+  return CURATED_BOARDS.filter(
+    (entry) =>
+      !excludeCompanies.has(entry.company.toLowerCase()) &&
+      entry.roles.some((tag) => roleText.includes(tag))
+  )
+    .slice(0, limit)
+    .map((entry) => ({ company: entry.company, url: boardUrlFor(entry) }));
+}
+
 /** Try the slug against Greenhouse then Lever. Honest fallback: null means
  * "no public Greenhouse or Lever board found", not "no jobs exist". */
 export async function guessBoardForCompany(company: string): Promise<JobBoardConfig | null> {
