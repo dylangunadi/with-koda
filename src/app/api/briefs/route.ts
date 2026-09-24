@@ -13,6 +13,14 @@ import { logKodaEvent } from "@/lib/koda/events";
  * This is the only place brief settings are written; profile saves never
  * touch them.
  */
+const SAVE_ERROR = "Could not update scheduled briefs. Try again.";
+
+/** Log the database error server-side; the client only sees SAVE_ERROR. */
+function saveFailed(context: string, error: { message: string; code?: string }) {
+  console.error(`[briefs] ${context} failed:`, error.code ?? "", error.message);
+  return NextResponse.json({ error: SAVE_ERROR }, { status: 500 });
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -36,9 +44,7 @@ export async function POST(request: Request) {
       pending_brief_frequency: null,
       pending_brief_email: null,
     }).eq("user_id", user.id);
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error) return saveFailed("Disable briefs", error);
     logKodaEvent(supabase, user.id, "scheduled_brief_disabled");
     return NextResponse.json({ enabled: false });
   }
@@ -70,7 +76,7 @@ export async function POST(request: Request) {
       pending_brief_frequency: null,
       pending_brief_email: null,
     }).eq("user_id", user.id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return saveFailed("Enable in-app briefs", error);
     logKodaEvent(supabase, user.id, "scheduled_brief_enabled", { frequency, email_digest: false });
     return NextResponse.json({ enabled: true, emailDigest: false });
   }
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
       autonomous_enabled: true,
       brief_frequency: frequency,
     }).eq("user_id", user.id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return saveFailed("Update brief frequency", error);
     logKodaEvent(supabase, user.id, "scheduled_brief_enabled", { frequency, email_digest: true });
     return NextResponse.json({ enabled: true, emailDigest: true });
   }
@@ -121,7 +127,7 @@ export async function POST(request: Request) {
     pending_brief_frequency: frequency,
     pending_brief_email: email,
   }).eq("user_id", user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return saveFailed("Start email confirmation", error);
 
   const result = await sendBriefConfirmationEmail({ to: email, userName: current.name || "there", token });
   if (!result.sent) {

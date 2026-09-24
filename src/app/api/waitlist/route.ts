@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -13,7 +13,12 @@ function field(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, MAX_FIELD_LENGTH) : null;
 }
 
-/** Client IP as seen by Vercel's proxy; hashed before it is stored. */
+/**
+ * Client IP as seen by Vercel's edge. Vercel overwrites x-forwarded-for (and
+ * sets x-real-ip) with the connecting client's address, so a client cannot
+ * spoof it on Vercel. Off Vercel (local dev, another host without a trusted
+ * proxy) both headers are client-controlled and this limit is advisory only.
+ */
 function clientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwarded || request.headers.get("x-real-ip") || "unknown";
@@ -43,7 +48,12 @@ export async function POST(request: NextRequest) {
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
 
-  const ipHash = createHash("sha256").update(clientIp(request)).digest("hex");
+  // Keyed hash: an unsalted SHA-256 of an IPv4 address is reversible by
+  // enumerating all 2^32 addresses. RATE_LIMIT_SECRET is preferred; the
+  // service key (already required above, never sent to clients) is the
+  // fallback so the route needs no new configuration to stay private.
+  const secret = process.env.RATE_LIMIT_SECRET || serviceKey;
+  const ipHash = createHmac("sha256", secret).update(clientIp(request)).digest("hex");
   const { data: allowed, error: limitError } = await supabase.rpc("rate_limit_hit", {
     p_key: `waitlist:ip:${ipHash}`,
     p_window_seconds: IP_WINDOW_SECONDS,

@@ -307,7 +307,7 @@ async function generateMoves(profile: Profile, agentContext?: AgentContext): Pro
   const secondCompany = pick(profile.target_companies, 1);
   const contacts = (profile.contacts_notes ?? "").trim();
   const hasContacts = contacts.length > 0 && !/^(none|no(ne)? yet|nobody|no one)\b/i.test(contacts);
-  const proof = (profile.proof_points ?? profile.resume_text ?? "").trim();
+  const proof = (profile.proof_points ?? "").trim();
   const stage = profile.recruiting_stage ?? "your current stage";
   const timeline = profile.timeline ?? "your timeline";
   const name = profile.name ?? "there";

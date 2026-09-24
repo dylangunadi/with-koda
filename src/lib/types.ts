@@ -1,3 +1,6 @@
+// Legacy columns (industries, resume_text, linkedin_url, focus_options,
+// semester_goal) still exist in the database but are intentionally absent
+// here: nothing collects them anymore, so nothing may read them.
 export interface Profile {
   id: string;
   user_id: string;
@@ -6,13 +9,8 @@ export interface Profile {
   year: string | null;
   target_roles: string[];
   target_companies: string[];
-  industries: string[];
   locations: string[];
   work_auth: string | null;
-  resume_text: string | null;
-  linkedin_url: string | null;
-  focus_options: string[];
-  semester_goal: string | null;
   contacts_notes: string | null;
   recruiting_stage: string | null;
   timeline: string | null;

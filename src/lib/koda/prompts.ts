@@ -152,29 +152,12 @@ export function buildUserPrompt(
   if (targetCompanies.length > 0) {
     parts.push(`Target companies: ${targetCompanies.join(", ")}`);
   }
-  const industries = profile.industries ?? [];
-  if (industries.length > 0) {
-    parts.push(`Industries: ${industries.join(", ")}`);
-  }
   const locations = profile.locations ?? [];
   if (locations.length > 0) {
     parts.push(`Preferred locations: ${locations.join(", ")}`);
   }
   if (profile.work_auth) {
     parts.push(`Work authorization: ${profile.work_auth}`);
-  }
-  if (profile.linkedin_url) {
-    parts.push(`LinkedIn: ${profile.linkedin_url}`);
-  }
-  if (profile.resume_text) {
-    parts.push(`\nResume:\n${profile.resume_text}`);
-  }
-  const focusOptions = profile.focus_options ?? [];
-  if (focusOptions.length > 0) {
-    parts.push(`\nFocus areas: ${focusOptions.join(", ")}`);
-  }
-  if (profile.semester_goal) {
-    parts.push(`\nSemester goal: ${profile.semester_goal}`);
   }
   if (profile.recruiting_stage) {
     parts.push(`Recruiting stage: ${profile.recruiting_stage}`);
