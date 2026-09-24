@@ -6,7 +6,6 @@ import { logKodaEvent, type KodaEventName } from "@/lib/koda/events";
 // or short-enum properties named below: browsers cannot be trusted with the
 // analytics namespace.
 const CLIENT_EVENTS: Record<string, string[]> = {
-  voice_permission_denied: [],
   // Perceived latency: ms from submit to first visible reply text, and total.
   turn_latency: ["first_delta_ms", "total_ms", "mode"],
 };

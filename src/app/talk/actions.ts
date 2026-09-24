@@ -5,21 +5,10 @@ import { getKodaAI } from "@/lib/koda/ai/provider";
 import { buildAgentContext } from "@/lib/koda/agentContext";
 import { insertBriefWithMoves } from "@/lib/koda/briefs";
 import { logKodaEvent } from "@/lib/koda/events";
+import { profileColumns, type EditableProfile } from "@/lib/koda/profileFields";
 import type { Brief, Profile } from "@/lib/types";
 
-export interface ReviewedProfile {
-  name: string;
-  school: string;
-  year: string;
-  target_roles: string[];
-  target_companies: string[];
-  locations: string[];
-  work_auth: string;
-  recruiting_stage: string;
-  timeline: string;
-  contacts: string;
-  proof_points: string;
-  success_definition: string;
+export interface ReviewedProfile extends EditableProfile {
   brief_frequency: "manual" | "weekly" | "daily";
   /** Whether the user changed any prefilled field on the review screen. */
   review_edited?: boolean;
@@ -30,15 +19,6 @@ export interface ConfirmResult {
   briefId?: string;
   briefError?: string;
   error?: string;
-}
-
-function clean(value: string | undefined | null, max = 2000): string | null {
-  const v = (value ?? "").trim();
-  return v ? v.slice(0, max) : null;
-}
-
-function cleanList(values: string[] | undefined | null): string[] {
-  return (values ?? []).map((s) => s.trim()).filter(Boolean).slice(0, 12);
 }
 
 /**
@@ -60,7 +40,8 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
     return { success: false, error: "Not authenticated" };
   }
 
-  if (!clean(review.name)) {
+  const columns = profileColumns(review);
+  if (!columns.name) {
     return { success: false, error: "Name is required" };
   }
 
@@ -87,18 +68,7 @@ export async function confirmOnboarding(review: ReviewedProfile): Promise<Confir
 
   const profileRow = {
     user_id: user.id,
-    name: clean(review.name, 120),
-    school: clean(review.school, 200),
-    year: clean(review.year, 60),
-    target_roles: cleanList(review.target_roles),
-    target_companies: cleanList(review.target_companies),
-    locations: cleanList(review.locations),
-    work_auth: clean(review.work_auth, 300),
-    recruiting_stage: clean(review.recruiting_stage, 200),
-    timeline: clean(review.timeline, 500),
-    contacts_notes: clean(review.contacts, 1000),
-    proof_points: clean(review.proof_points, 1000),
-    success_definition: clean(review.success_definition, 500),
+    ...columns,
     // Daily/Weekly chosen at review consents to in-app scheduled briefs
     // (autonomous_enabled). brief_confirmed stays false: that flag belongs to
     // the email double-opt-in flow and is only set by /api/briefs/confirm.

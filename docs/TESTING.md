@@ -37,6 +37,8 @@ In environments that cannot download the pinned Chromium build, point at a cache
 | `tests/ongoing-talk.spec.ts` | Relationship capture with confirm/decline, goal-update diffs, next-move recommendations |
 | `tests/cron-brief.spec.ts` | Scheduled brief idempotency, consent gating, manual users untouched, secret rejection (serial) |
 | `tests/settings-briefs.spec.ts` | Profile edits never revoke scheduled-brief consent; enable/disable round-trips |
+| `tests/settings-profile.spec.ts` | Settings loads and saves the same profile fields chat onboarding writes; legacy fields are gone |
+| `tests/rate-limits.spec.ts` | Waitlist per-IP limit and input validation; brief confirmation email per-address and per-user limits (refused requests change nothing) |
 | `tests/instrumentation.spec.ts` | Activation event trail exists; no user content leaks into event properties |
 | `tests/helpers/` | `env.ts` (.env.local parsing), `db.ts` (service-role seeding/assertions, refuses non-local Supabase), `auth.ts` (UI login/signup) |
 

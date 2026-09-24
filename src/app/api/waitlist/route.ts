@@ -1,49 +1,82 @@
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Per-IP signup limit (fixed window, Supabase-backed via rate_limit_hit).
+const IP_LIMIT = 5;
+const IP_WINDOW_SECONDS = 60 * 60;
+const MAX_FIELD_LENGTH = 200;
+
+const GENERIC_ERROR = "Could not join the waitlist. Try again shortly.";
+
+function field(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, MAX_FIELD_LENGTH) : null;
+}
+
+/** Client IP as seen by Vercel's proxy; hashed before it is stored. */
+function clientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || request.headers.get("x-real-ip") || "unknown";
+}
+
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : null;
-
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
-    }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !key) {
-      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
-    }
-
-    const supabase = createClient(url, key, { auth: { persistSession: false } });
-
-    const row = {
-      email,
-      name: body.name?.trim() || null,
-      school: body.school?.trim() || null,
-      class_year: body.classYear?.trim() || null,
-      recruiting_stage: body.recruitingStage?.trim() || null,
-      source: "website",
-      status: "new",
-    };
-
-    const { error: insertError } = await supabase.from("waitlist").insert(row);
-
-    if (insertError) {
-      // Duplicate email — treat as success
-      if (insertError.code === "23505") {
-        return NextResponse.json({ success: true, status: "duplicate" });
-      }
-      console.error("[waitlist]", insertError);
-      return NextResponse.json({ error: "Failed to join waitlist." }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true, status: "created" });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("[waitlist]", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+  // Fail closed: inserts require the service role. The public key is never a
+  // fallback (the table grants nothing to anon).
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    console.error("[waitlist] Missing Supabase service configuration");
+    return NextResponse.json({ error: GENERIC_ERROR }, { status: 503 });
   }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const email = field(body.email)?.toLowerCase() ?? null;
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+    return NextResponse.json({ error: "Enter a valid email" }, { status: 400 });
+  }
+
+  const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
+
+  const ipHash = createHash("sha256").update(clientIp(request)).digest("hex");
+  const { data: allowed, error: limitError } = await supabase.rpc("rate_limit_hit", {
+    p_key: `waitlist:ip:${ipHash}`,
+    p_window_seconds: IP_WINDOW_SECONDS,
+    p_limit: IP_LIMIT,
+  });
+  if (limitError) {
+    console.error("[waitlist] Rate limit check failed:", limitError.message);
+    return NextResponse.json({ error: GENERIC_ERROR }, { status: 503 });
+  }
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  }
+
+  const row = {
+    email,
+    name: field(body.name),
+    school: field(body.school),
+    class_year: field(body.classYear),
+    recruiting_stage: field(body.recruitingStage),
+    source: "website",
+    status: "new",
+  };
+
+  const { error: insertError } = await supabase.from("waitlist").insert(row);
+
+  if (insertError) {
+    // Duplicate email — treat as success
+    if (insertError.code === "23505") {
+      return NextResponse.json({ success: true, status: "duplicate" });
+    }
+    console.error("[waitlist] Insert failed:", insertError.message);
+    return NextResponse.json({ error: GENERIC_ERROR }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, status: "created" });
 }

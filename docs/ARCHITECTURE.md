@@ -19,15 +19,16 @@ All backend logic runs as Next.js API routes and server actions:
 | `/api/talk` | POST | User | One conversational turn, streamed as an event stream of reply deltas plus a final payload (onboarding mode until a profile exists, then ongoing) |
 | `/api/talk/confirm` | POST | User | Resolve a pending conversation proposal (relationship memory or profile diff) |
 | `/api/events` | POST | User | Whitelisted client-originated product events |
-| `/api/moves` | GET | User | List moves (optional status filter) |
 | `/api/moves/generate` | POST | User | Generate a manual brief (3 moves) via the AI provider |
 | `/api/moves/[id]` | PATCH | User | Update move status or outreach draft (`sent` rejected) |
-| `/api/briefs` | POST | User | Scheduled-brief consent and email-digest opt-in (sole writer of brief settings) |
+| `/api/briefs` | POST | User | Scheduled-brief consent and email-digest opt-in (sole writer of brief settings); confirmation emails limited to 5 per user per hour and 3 per address per day |
 | `/api/briefs/confirm` | GET | Token | Email double-opt-in confirmation |
 | `/api/cron/brief` | GET | CRON_SECRET | Scheduled brief generation, idempotent per user per day |
-| `/api/waitlist` | POST | Public | Waitlist signup |
+| `/api/waitlist` | POST | Public | Waitlist signup; service role only (fails closed without it), 5 per IP per hour |
 
-Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist reviewed profile, close conversation, generate first brief — idempotent); `saveProfile` in `src/app/onboarding/actions.ts` (profile fields only; never touches brief settings).
+Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist reviewed profile, close conversation, generate first brief — idempotent); `updateProfile` in `src/app/settings/actions.ts` (the same profile fields onboarding writes, via `src/lib/koda/profileFields.ts`; never touches brief settings).
+
+Rate limiting: fixed-window counters in `rate_limit_counters`, incremented atomically by `rate_limit_hit()` (service role only). Signed-in users reach it only through `claim_brief_confirmation_email()`, which derives the per-user key from the JWT.
 
 ## AI Provider Layer
 
@@ -59,6 +60,8 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
   - `koda_conversations` / `koda_messages` — conversation state; `extracted` jsonb is the structured resume mechanism; proposals live on message payloads
   - `relationships` — confirmed relationship memory; `source_message` preserves the user's words verbatim
   - `koda_events` — product event log (ids/enums/counts only; see `src/lib/koda/events.ts`)
+  - `waitlist` — landing-page signups; service-role inserts only (no anon/authenticated grants)
+  - `rate_limit_counters` — fixed-window counters behind `rate_limit_hit()` (keys hash IPs and emails)
 - All tables have RLS policies scoping data to `auth.uid() = user_id`
 - Migrations in `supabase/migrations/`. Known issue: the two `20260710_*` files sort against their dependency order; apply `koda_mvp_schema` before `koda_agentic_layer` on a fresh database.
 - Cron endpoint uses service role key to bypass RLS
@@ -133,7 +136,6 @@ Preview-scoped Vercel variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABA
 - **Sequential cron**: Scheduled briefs process users one at a time; will not scale past ~100 users without parallelization or queuing
 - **No database types**: Supabase client is untyped; queries return `any`
 - **No input validation library**: API routes validate manually (no Zod/Yup)
-- **Service role key in API route**: `/api/waitlist` falls back to anon key if service role unavailable
 - **No error monitoring**: No Sentry or equivalent; errors go to console
 - **No rate limiting infrastructure**: Move generation rate limit is per-user DB query, not middleware-level
 - **koda_events RLS**: browsers could insert events directly for their own user, bypassing the `/api/events` whitelist (self-pollution only)

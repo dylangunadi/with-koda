@@ -44,8 +44,7 @@ interface TurnAttempt {
 /**
  * Talk to Koda: a contained chat surface. The page never grows — the
  * transcript is the only scrolling region and follows new messages, while
- * the header and composer stay fixed. Voice calls live on the
- * feat/voice-call-onboarding branch.
+ * the header and composer stay fixed.
  */
 export function TalkToKoda({
   mode,
@@ -136,7 +135,7 @@ export function TalkToKoda({
         const res = await fetch("/api/talk", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ message: text, inputMode: "text", turnId }),
+          body: JSON.stringify({ message: text, turnId }),
         });
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => ({}));

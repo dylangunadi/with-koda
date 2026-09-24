@@ -13,28 +13,26 @@ with-koda/
         actions.ts                # Server action: confirmOnboarding (profile + first brief)
       onboarding/                 # Legacy route: redirects to /talk
         page.tsx                  # Redirect
-        actions.ts                # Server action: saveProfile (profile fields only)
       inbox/                      # Main app — agent inbox / brief surface
         page.tsx                  # Server component: fetches moves + latest brief
         layout.tsx                # AppShell wrapper
       settings/                   # Profile editing + scheduled briefs
-        page.tsx                  # Client component: edit profile
+        page.tsx                  # Client component: edit profile (same fields as onboarding)
+        actions.ts                # Server action: updateProfile (profile fields only)
         layout.tsx                # AppShell wrapper
       api/
         talk/route.ts             # POST — conversational turn (onboarding/ongoing)
         talk/confirm/route.ts     # POST — resolve conversation proposals
         events/route.ts           # POST — whitelisted client product events
-        waitlist/route.ts         # POST — waitlist signup
-        moves/route.ts            # GET — list moves
+        waitlist/route.ts         # POST — waitlist signup (service role only, IP rate limited)
         moves/generate/route.ts   # POST — generate a manual brief via the AI provider
         moves/[id]/route.ts       # PATCH — update move status/draft ('sent' rejected)
-        briefs/route.ts           # POST — scheduled-brief consent + email opt-in
+        briefs/route.ts           # POST — scheduled-brief consent + email opt-in (rate limited)
         briefs/confirm/route.ts   # GET — email double-opt-in confirmation
         cron/brief/route.ts       # GET — scheduled brief cron (idempotent per day)
     components/
       ui/                         # shadcn/ui primitives
-      talk/                       # TalkToKoda, ReviewConfirm, ConfirmationCard,
-                                  #   VoiceInput, useSpeechRecognition
+      talk/                       # TalkToKoda, ReviewConfirm, ConfirmationCard
       AppShell.tsx                # Authenticated layout (nav + sign out)
       BriefHeader.tsx             # Brief label above the latest brief's moves
       MoveCard.tsx                # Move card: Accept/Complete/Save/Not relevant
@@ -49,6 +47,7 @@ with-koda/
       koda/generateRecruitingMoves.ts  # Thin wrapper over the provider
       koda/prompts.ts             # System prompts + prompt builders
       koda/onboarding.ts          # Server-side onboarding checklist + merge rules
+      koda/profileFields.ts       # Editable profile fields shared by onboarding + settings
       koda/briefs.ts              # insertBriefWithMoves (brief + moves + events)
       koda/agentContext.ts        # Feedback patterns + relationship memory
       koda/events.ts              # koda_events logging (privacy rules in header)
@@ -99,7 +98,7 @@ with-koda/
 - **Path alias**: `@/*` maps to `./src/*`
 - **Components**: Co-located in `src/components/`, shadcn primitives in `src/components/ui/`
 - **Server vs client**: Server components by default; `"use client"` only when needed
-- **Server actions**: Used for mutations (e.g., `saveProfile`)
+- **Server actions**: Used for mutations (e.g., `updateProfile`)
 - **API routes**: REST-style in `src/app/api/`; auth via `supabase.auth.getUser()`
 - **State**: Local `useState`; no global state library
 - **Toasts**: `sonner` via `toast.success()` / `toast.error()`

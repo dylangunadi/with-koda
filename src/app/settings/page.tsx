@@ -14,10 +14,59 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { saveProfile } from "@/app/onboarding/actions"
+import { updateProfile } from "@/app/settings/actions"
 import type { Profile } from "@/lib/types"
 
-const YEAR_OPTIONS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"]
+// Same fields and labels as the onboarding review (ReviewConfirm), so Settings
+// edits exactly what chat onboarding collected.
+type ProfileField =
+  | "name"
+  | "school"
+  | "year"
+  | "target_roles"
+  | "target_companies"
+  | "locations"
+  | "work_auth"
+  | "recruiting_stage"
+  | "timeline"
+  | "contacts"
+  | "proof_points"
+  | "success_definition"
+
+const SECTIONS: { title: string; fields: { key: ProfileField; label: string; textarea?: boolean }[] }[] = [
+  {
+    title: "About you",
+    fields: [
+      { key: "name", label: "Name" },
+      { key: "school", label: "School" },
+      { key: "year", label: "Year" },
+    ],
+  },
+  {
+    title: "Targets",
+    fields: [
+      { key: "target_roles", label: "Target roles (comma separated)" },
+      { key: "target_companies", label: "Target companies (comma separated)" },
+      { key: "locations", label: "Locations (comma separated)" },
+    ],
+  },
+  {
+    title: "Situation",
+    fields: [
+      { key: "work_auth", label: "Work authorization" },
+      { key: "recruiting_stage", label: "Recruiting stage" },
+      { key: "timeline", label: "Timing and deadlines" },
+    ],
+  },
+  {
+    title: "People, proof, and goals",
+    fields: [
+      { key: "contacts", label: "People you already know", textarea: true },
+      { key: "proof_points", label: "Projects and proof of work", textarea: true },
+      { key: "success_definition", label: "What success looks like", textarea: true },
+    ],
+  },
+]
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -25,8 +74,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [resumeFileName, setResumeFileName] = useState("")
-  const [resumeFileError, setResumeFileError] = useState<string | null>(null)
   const [briefNotice, setBriefNotice] = useState<string | null>(null)
   const [savedBrief, setSavedBrief] = useState({ enabled: false, confirmed: false, frequency: "daily", email: "" })
 
@@ -36,13 +83,13 @@ export default function SettingsPage() {
     year: "",
     target_roles: "",
     target_companies: "",
-    industries: "",
     locations: "",
     work_auth: "",
-    resume_text: "",
-    linkedin_url: "",
-    focus_options: [] as string[],
-    semester_goal: "",
+    recruiting_stage: "",
+    timeline: "",
+    contacts: "",
+    proof_points: "",
+    success_definition: "",
     autonomous_enabled: false,
     brief_frequency: "daily",
     brief_email: "",
@@ -84,13 +131,13 @@ export default function SettingsPage() {
           year: data.year ?? "",
           target_roles: (data.target_roles ?? []).join(", "),
           target_companies: (data.target_companies ?? []).join(", "),
-          industries: (data.industries ?? []).join(", "),
           locations: (data.locations ?? []).join(", "),
           work_auth: data.work_auth ?? "",
-          resume_text: data.resume_text ?? "",
-          linkedin_url: data.linkedin_url ?? "",
-          focus_options: data.focus_options ?? [],
-          semester_goal: data.semester_goal ?? "",
+          recruiting_stage: data.recruiting_stage ?? "",
+          timeline: data.timeline ?? "",
+          contacts: data.contacts_notes ?? "",
+          proof_points: data.proof_points ?? "",
+          success_definition: data.success_definition ?? "",
           autonomous_enabled: data.autonomous_enabled ?? false,
           brief_frequency: data.brief_frequency ?? "daily",
           brief_email: data.brief_email ?? "",
@@ -109,21 +156,6 @@ export default function SettingsPage() {
     setBriefNotice(null)
   }
 
-  function handleResumeUpload(file: File | undefined) {
-    if (!file) return
-
-    setResumeFileError(null)
-    const reader = new FileReader()
-    reader.onload = () => {
-      update("resume_text", typeof reader.result === "string" ? reader.result : "")
-      setResumeFileName(file.name)
-    }
-    reader.onerror = () => {
-      setResumeFileError("We could not read that file. Please try another one.")
-    }
-    reader.readAsText(file)
-  }
-
   async function handleSave() {
     setError(null)
     setSuccess(false)
@@ -132,12 +164,21 @@ export default function SettingsPage() {
       const splitCommas = (s: string) => s.split(",").map(v => v.trim()).filter(Boolean)
       // Profile fields only; scheduled-brief consent and email are managed
       // exclusively by /api/briefs below.
-      await saveProfile({
-        ...form,
+      const saved = await updateProfile({
+        name: form.name,
+        school: form.school,
+        year: form.year,
         target_roles: splitCommas(form.target_roles),
-        industries: splitCommas(form.industries),
+        target_companies: splitCommas(form.target_companies),
         locations: splitCommas(form.locations),
+        work_auth: form.work_auth,
+        recruiting_stage: form.recruiting_stage,
+        timeline: form.timeline,
+        contacts: form.contacts,
+        proof_points: form.proof_points,
+        success_definition: form.success_definition,
       })
+      if (!saved.success) throw new Error(saved.error || "Could not save your profile")
 
       const frequency = ["daily", "weekly"].includes(form.brief_frequency) ? form.brief_frequency : "daily"
       const email = form.brief_email.trim()
@@ -201,183 +242,34 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-8">
-        {/* About You */}
-        <div className="page-enter" style={{ animationDelay: "60ms" }}>
-          <p className="font-system text-primary mb-3">About you</p>
-          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="Your full name"
-                value={form.name}
-                onChange={(e) => update("name", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="school">School</Label>
-              <Input
-                id="school"
-                placeholder="Your university"
-                value={form.school}
-                onChange={(e) => update("school", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Year</Label>
-              <Select
-                value={form.year}
-                onValueChange={(val) => update("year", val ?? "")}
-              >
-                <SelectTrigger className="w-full h-11 rounded-lg">
-                  <SelectValue placeholder="Select your year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {YEAR_OPTIONS.map((yr) => (
-                    <SelectItem key={yr} value={yr}>
-                      {yr}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-
-        {/* Targets */}
-        <div className="page-enter" style={{ animationDelay: "120ms" }}>
-          <p className="font-system text-primary mb-3">Targets</p>
-          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="target_roles">Target Roles</Label>
-              <Input
-                id="target_roles"
-                placeholder="PM, SWE, startup ops..."
-                value={form.target_roles}
-                onChange={(e) => update("target_roles", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-              <p className="text-xs text-muted-foreground">
-                Separate multiple roles with commas
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="target_companies">Target Companies</Label>
-              <Input
-                id="target_companies"
-                placeholder="Google, Stripe, Notion..."
-                value={form.target_companies}
-                onChange={(e) => update("target_companies", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-              <p className="text-xs text-muted-foreground">
-                Separate multiple companies with commas
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="industries">Industries</Label>
-              <Input
-                id="industries"
-                placeholder="Tech, Finance, Healthcare..."
-                value={form.industries}
-                onChange={(e) => update("industries", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-              <p className="text-xs text-muted-foreground">
-                Separate multiple industries with commas
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="locations">Locations</Label>
-              <Input
-                id="locations"
-                placeholder="San Francisco, New York, Remote..."
-                value={form.locations}
-                onChange={(e) => update("locations", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-              <p className="text-xs text-muted-foreground">
-                Separate multiple locations with commas
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Background */}
-        <div className="page-enter" style={{ animationDelay: "180ms" }}>
-          <p className="font-system text-primary mb-3">Background</p>
-          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="work_auth">Work Authorization</Label>
-              <Input
-                id="work_auth"
-                placeholder="e.g. US Citizen, F-1 OPT, H-1B..."
-                value={form.work_auth}
-                onChange={(e) => update("work_auth", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-              <p className="text-xs text-muted-foreground">Optional</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="resume_file">Resume</Label>
-              <Input
-                id="resume_file"
-                type="file"
-                accept=".pdf,.txt,.doc,.docx"
-                onChange={(e) => handleResumeUpload(e.target.files?.[0])}
-                className="h-11 rounded-lg file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium"
-              />
-              <p className="text-xs text-muted-foreground">
-                Upload a PDF, TXT, DOC, or DOCX file to replace your current resume.
-              </p>
-              {resumeFileError && (
-                <p className="text-xs text-destructive">{resumeFileError}</p>
-              )}
-              {form.resume_text && (
-                <div className="rounded-lg border border-border bg-muted/30 p-3">
-                  <p className="mb-1 text-xs font-medium text-foreground">
-                    {resumeFileName || "Current resume preview"}
-                  </p>
-                  <p className="max-h-32 overflow-hidden whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-                    {form.resume_text.slice(0, 1000)}
-                    {form.resume_text.length > 1000 ? "…" : ""}
-                  </p>
+        {SECTIONS.map((section, i) => (
+          <div key={section.title} className="page-enter" style={{ animationDelay: `${60 * (i + 1)}ms` }}>
+            <p className="font-system text-primary mb-3">{section.title}</p>
+            <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
+              {section.fields.map((f) => (
+                <div key={f.key} className="space-y-2">
+                  <Label htmlFor={f.key}>{f.label}</Label>
+                  {f.textarea ? (
+                    <Textarea
+                      id={f.key}
+                      value={form[f.key]}
+                      onChange={(e) => update(f.key, e.target.value)}
+                      rows={3}
+                      className="rounded-lg"
+                    />
+                  ) : (
+                    <Input
+                      id={f.key}
+                      value={form[f.key]}
+                      onChange={(e) => update(f.key, e.target.value)}
+                      className="h-11 rounded-lg"
+                    />
+                  )}
                 </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="linkedin_url">LinkedIn URL</Label>
-              <Input
-                id="linkedin_url"
-                placeholder="https://linkedin.com/in/yourname"
-                value={form.linkedin_url}
-                onChange={(e) => update("linkedin_url", e.target.value)}
-                className="h-11 rounded-lg"
-              />
-              <p className="text-xs text-muted-foreground">Optional</p>
+              ))}
             </div>
           </div>
-        </div>
-
-        {/* Goals */}
-        <div className="page-enter" style={{ animationDelay: "240ms" }}>
-          <p className="font-system text-primary mb-3">Goals</p>
-          <div className="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="semester_goal">Semester Goal</Label>
-              <Textarea
-                id="semester_goal"
-                placeholder="What kind of opportunity would make this semester successful?"
-                value={form.semester_goal}
-                onChange={(e) => update("semester_goal", e.target.value)}
-                rows={4}
-                className="rounded-lg"
-              />
-            </div>
-          </div>
-        </div>
+        ))}
 
         {/* Autonomous Briefs */}
         <div className="page-enter" style={{ animationDelay: "300ms" }}>

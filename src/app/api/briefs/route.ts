@@ -90,6 +90,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ enabled: true, emailDigest: true });
   }
 
+  // Confirmation emails are rate limited per user and per destination address
+  // (limits live in claim_brief_confirmation_email). Checked before any state
+  // changes so a refused request leaves the profile untouched.
+  const { data: allowed, error: limitError } = await supabase.rpc(
+    "claim_brief_confirmation_email",
+    { p_email: email }
+  );
+  if (limitError) {
+    console.error("[briefs] Rate limit check failed:", limitError.message);
+    return NextResponse.json({ error: "We could not send the confirmation email. Try again shortly." }, { status: 503 });
+  }
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many confirmation emails requested. Try again later." },
+      { status: 429 }
+    );
+  }
+
   // New or changed address: in-app briefs turn on now; the email digest stays
   // off (brief_email cleared) until the confirmation link is clicked.
   const token = randomBytes(32).toString("hex");

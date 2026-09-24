@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { message?: unknown; inputMode?: unknown; turnId?: unknown };
+  let body: { message?: unknown; turnId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -59,7 +59,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  const inputMode = body.inputMode === "voice" ? "voice" : "text";
   const turnId =
     typeof body.turnId === "string" && body.turnId.length <= MAX_TURN_ID_LENGTH
       ? body.turnId
@@ -87,9 +86,9 @@ export async function POST(request: Request) {
       };
       try {
         if (profileRow) {
-          await ongoingTurn(supabase, user.id, profileRow as Profile, message, inputMode, turnId, request, emit);
+          await ongoingTurn(supabase, user.id, profileRow as Profile, message, turnId, request, emit);
         } else {
-          await onboardingTurn(supabase, user.id, message, inputMode, turnId, request, emit);
+          await onboardingTurn(supabase, user.id, message, turnId, request, emit);
         }
       } catch (err) {
         console.error("Talk turn failed unexpectedly:", err);
@@ -124,7 +123,6 @@ async function onboardingTurn(
   supabase: ServerSupabase,
   userId: string,
   message: string,
-  inputMode: "text" | "voice",
   turnId: string | null,
   request: Request,
   emit: (event: StreamEvent) => void
@@ -206,7 +204,7 @@ async function onboardingTurn(
     user_id: userId,
     role: "user",
     content: message,
-    input_mode: inputMode,
+    input_mode: "text",
     payload: turnId ? { turn_id: turnId } : {},
   });
   if (userMsgError) {
@@ -247,12 +245,8 @@ async function onboardingTurn(
   }
 
   logKodaEvent(supabase, userId, "onboarding_message_submitted", {
-    input_mode: inputMode,
     fields_remaining: remaining.length,
   });
-  if (inputMode === "voice") {
-    logKodaEvent(supabase, userId, "voice_input_used", { mode: "onboarding" });
-  }
 
   emit({
     type: "final",
@@ -274,7 +268,6 @@ async function ongoingTurn(
   userId: string,
   profile: Profile,
   message: string,
-  inputMode: "text" | "voice",
   turnId: string | null,
   request: Request,
   emit: (event: StreamEvent) => void
@@ -370,7 +363,7 @@ async function ongoingTurn(
       user_id: userId,
       role: "user",
       content: message,
-      input_mode: inputMode,
+      input_mode: "text",
       payload: turnId ? { turn_id: turnId } : {},
     })
     .select()
@@ -416,9 +409,6 @@ async function ongoingTurn(
     return;
   }
 
-  if (inputMode === "voice") {
-    logKodaEvent(supabase, userId, "voice_input_used", { mode: "ongoing" });
-  }
   if (turn.intent === "ask_next_move") {
     logKodaEvent(supabase, userId, "next_move_requested");
   }

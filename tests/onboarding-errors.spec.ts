@@ -61,7 +61,7 @@ test("duplicate rapid submission does not create a second turn", async ({ page }
   // shares the session cookies). The route streams; the last data frame is
   // the final payload.
   const second = await page.request.post("/api/talk", {
-    data: { message: "I'm Alex at Stanford", inputMode: "text" },
+    data: { message: "I'm Alex at Stanford" },
   });
   const before = await countMessages();
   expect(second.ok()).toBeTruthy();
