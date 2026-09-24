@@ -1,6 +1,6 @@
-import { createHmac } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimitHash } from "@/lib/koda/rateLimit";
 
 // Per-IP signup limit (fixed window, Supabase-backed via rate_limit_hit).
 const IP_LIMIT = 5;
@@ -25,12 +25,18 @@ function clientIp(request: NextRequest): string {
 }
 
 export async function POST(request: NextRequest) {
-  // Fail closed: inserts require the service role. The public key is never a
-  // fallback (the table grants nothing to anon).
+  // Fail closed: inserts require the service role (the public key is never a
+  // fallback; the table grants nothing to anon), and the rate limiter
+  // requires RATE_LIMIT_SECRET.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) {
     console.error("[waitlist] Missing Supabase service configuration");
+    return NextResponse.json({ error: GENERIC_ERROR }, { status: 503 });
+  }
+  const ipHash = rateLimitHash(clientIp(request));
+  if (!ipHash) {
+    console.error("[waitlist] Missing RATE_LIMIT_SECRET");
     return NextResponse.json({ error: GENERIC_ERROR }, { status: 503 });
   }
 
@@ -48,12 +54,6 @@ export async function POST(request: NextRequest) {
 
   const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
 
-  // Keyed hash: an unsalted SHA-256 of an IPv4 address is reversible by
-  // enumerating all 2^32 addresses. RATE_LIMIT_SECRET is preferred; the
-  // service key (already required above, never sent to clients) is the
-  // fallback so the route needs no new configuration to stay private.
-  const secret = process.env.RATE_LIMIT_SECRET || serviceKey;
-  const ipHash = createHmac("sha256", secret).update(clientIp(request)).digest("hex");
   const { data: allowed, error: limitError } = await supabase.rpc("rate_limit_hit", {
     p_key: `waitlist:ip:${ipHash}`,
     p_window_seconds: IP_WINDOW_SECONDS,

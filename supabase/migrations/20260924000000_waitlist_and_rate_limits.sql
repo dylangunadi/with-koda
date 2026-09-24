@@ -107,9 +107,12 @@ revoke execute on function public.rate_limit_hit(text, integer, integer) from pu
 grant execute on function public.rate_limit_hit(text, integer, integer) to service_role;
 
 -- Brief confirmation emails: callable by signed-in users, keyed on the
--- caller's own id (from the JWT, never a parameter) and a hash of the
--- destination address. Limits: 5 per user per hour, 3 per address per day.
-create or replace function public.claim_brief_confirmation_email(p_email text)
+-- caller's own id (from the JWT, never a parameter) and on p_email_hash, an
+-- HMAC-SHA256 (hex) of the lowercased destination address computed by the
+-- API route with RATE_LIMIT_SECRET. The database never sees the address.
+-- Limits: 5 per user per hour, 3 per address per day.
+drop function if exists public.claim_brief_confirmation_email(text);
+create function public.claim_brief_confirmation_email(p_email_hash text)
 returns boolean
 language plpgsql
 security definer
@@ -121,14 +124,13 @@ begin
   if uid is null then
     return false;
   end if;
+  if p_email_hash is null or p_email_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'p_email_hash must be a hex HMAC-SHA256 digest';
+  end if;
   if not rate_limit_hit('brief_confirm:user:' || uid::text, 3600, 5) then
     return false;
   end if;
-  return rate_limit_hit(
-    'brief_confirm:email:' || md5(lower(trim(p_email))),
-    86400,
-    3
-  );
+  return rate_limit_hit('brief_confirm:email:' || p_email_hash, 86400, 3);
 end;
 $$;
 

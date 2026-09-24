@@ -28,7 +28,7 @@ All backend logic runs as Next.js API routes and server actions:
 
 Server actions: `confirmOnboarding` in `src/app/talk/actions.ts` (persist reviewed profile, close conversation, generate first brief — idempotent); `updateProfile` in `src/app/settings/actions.ts` (the same profile fields onboarding writes, via `src/lib/koda/profileFields.ts`; never touches brief settings).
 
-Rate limiting: fixed-window counters in `rate_limit_counters`, incremented atomically by `rate_limit_hit()` (service role only). Signed-in users reach it only through `claim_brief_confirmation_email()`, which derives the per-user key from the JWT.
+Rate limiting: fixed-window counters in `rate_limit_counters`, incremented atomically by `rate_limit_hit()` (service role only). Signed-in users reach it only through `claim_brief_confirmation_email(p_email_hash)`, which derives the per-user key from the JWT. Client IPs and email addresses are keyed with HMAC-SHA256 using `RATE_LIMIT_SECRET` (`src/lib/koda/rateLimit.ts`) before they reach the database; `/api/waitlist` and the confirmation-email path return 503 when the secret is missing.
 
 ## AI Provider Layer
 
@@ -63,7 +63,7 @@ Server-authoritative rules regardless of provider: the onboarding checklist and 
   - `waitlist` — landing-page signups; service-role inserts only (no anon/authenticated grants)
   - `rate_limit_counters` — fixed-window counters behind `rate_limit_hit()` (keys hash IPs and emails)
 - All tables have RLS policies scoping data to `auth.uid() = user_id`
-- Migrations in `supabase/migrations/`. Known issue: the two `20260710_*` files sort against their dependency order; apply `koda_mvp_schema` before `koda_agentic_layer` on a fresh database.
+- Migrations in `supabase/migrations/`, applied in filename order. The two 2026-07-10 files were renamed to `20260710000000_*` / `20260710000001_*` so they sort in dependency order (production's history needs a one-time `supabase migration repair`; see the cleanup/v3 runbook).
 - Cron endpoint uses service role key to bypass RLS
 
 ## Third-Party Integrations

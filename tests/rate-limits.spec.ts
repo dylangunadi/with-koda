@@ -1,6 +1,8 @@
+import { createHash, createHmac } from "node:crypto";
 import { test, expect } from "@playwright/test";
 import { adminClient, seedOnboardedUser, uniqueEmail } from "./helpers/db";
 import { loginViaUi } from "./helpers/auth";
+import { testEnv } from "./helpers/env";
 
 test("waitlist signups are rate limited per client IP", async ({ request }) => {
   // A fresh documentation-range IP per run so reruns start from zero.
@@ -66,4 +68,36 @@ test("brief confirmation emails are rate limited per address and per user", asyn
     expect((await enable(uniqueEmail("digest"))).status()).not.toBe(429);
   }
   expect((await enable(uniqueEmail("digest"))).status()).toBe(429);
+});
+
+test("the confirmation-email limit stores a keyed hash of the address, never MD5 or SHA-256", async ({ page }) => {
+  const { user } = await seedOnboardedUser("confirmhash");
+  // Mixed case on purpose: the key must be derived from the lowercased address.
+  const typed = uniqueEmail("Digest").replace("digest", "Digest").replace("example.com", "Example.COM");
+  const lower = typed.toLowerCase();
+
+  await loginViaUi(page, user.email);
+  const res = await page.request.post("/api/briefs", {
+    data: { enabled: true, frequency: "daily", email: typed },
+  });
+  expect(res.status()).not.toBe(429);
+
+  const secret = testEnv().RATE_LIMIT_SECRET;
+  expect(secret, "RATE_LIMIT_SECRET must be set in .env.local").toBeTruthy();
+  const key = (hash: string) => `brief_confirm:email:${hash}`;
+  const hmac = createHmac("sha256", secret).update(lower).digest("hex");
+  const forbidden = [typed, lower].flatMap((v) => [
+    createHash("md5").update(v).digest("hex"),
+    createHash("sha256").update(v).digest("hex"),
+  ]);
+
+  const { data: rows, error } = await adminClient()
+    .from("rate_limit_counters")
+    .select("key")
+    .in("key", [key(hmac), ...forbidden.map(key)]);
+  expect(error).toBeNull();
+  expect(rows!.map((r) => r.key)).toEqual([key(hmac)]);
+  for (const hash of forbidden) {
+    expect(hash).not.toBe(hmac);
+  }
 });

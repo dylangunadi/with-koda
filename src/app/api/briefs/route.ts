@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendBriefConfirmationEmail } from "@/lib/koda/email";
 import { logKodaEvent } from "@/lib/koda/events";
+import { rateLimitHash } from "@/lib/koda/rateLimit";
 
 /**
  * Manage scheduled-brief settings. Consent model:
@@ -97,11 +98,17 @@ export async function POST(request: Request) {
   }
 
   // Confirmation emails are rate limited per user and per destination address
-  // (limits live in claim_brief_confirmation_email). Checked before any state
+  // (limits live in claim_brief_confirmation_email). The address is passed
+  // only as a keyed hash of its lowercased form. Checked before any state
   // changes so a refused request leaves the profile untouched.
+  const emailHash = rateLimitHash(email.toLowerCase());
+  if (!emailHash) {
+    console.error("[briefs] Missing RATE_LIMIT_SECRET");
+    return NextResponse.json({ error: "We could not send the confirmation email. Try again shortly." }, { status: 503 });
+  }
   const { data: allowed, error: limitError } = await supabase.rpc(
     "claim_brief_confirmation_email",
-    { p_email: email }
+    { p_email_hash: emailHash }
   );
   if (limitError) {
     console.error("[briefs] Rate limit check failed:", limitError.message);

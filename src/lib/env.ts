@@ -21,3 +21,7 @@ export function getResendApiKey(): string | null {
 export function getCronSecret(): string | null {
   return process.env.CRON_SECRET ?? null;
 }
+
+export function getRateLimitSecret(): string | null {
+  return process.env.RATE_LIMIT_SECRET || null;
+}

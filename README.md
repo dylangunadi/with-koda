@@ -36,8 +36,8 @@ cp .env.example .env.local
 
 # 4. Apply database migrations
 # Run both migration files in order:
-# supabase/migrations/20260710_koda_mvp_schema.sql
-# supabase/migrations/20260710_koda_agentic_layer.sql
+# supabase/migrations/20260710000000_koda_mvp_schema.sql
+# supabase/migrations/20260710000001_koda_agentic_layer.sql
 # via the Supabase dashboard SQL editor or supabase db push
 
 # 5. Start the dev server
@@ -69,8 +69,8 @@ The app will be available at your Vercel domain (e.g., withkoda.app).
 
 Two migrations in `supabase/migrations/`:
 
-1. `20260710_koda_mvp_schema.sql` — creates `profiles`, `recruiting_moves`, `move_events` tables with RLS
-2. `20260710_koda_agentic_layer.sql` — adds `source_note` to moves, autonomous brief settings to profiles
+1. `20260710000000_koda_mvp_schema.sql` — creates `profiles`, `recruiting_moves`, `move_events` tables with RLS
+2. `20260710000001_koda_agentic_layer.sql` — adds `source_note` to moves, autonomous brief settings to profiles
 
 All tables have RLS policies scoping data to the authenticated user.
 

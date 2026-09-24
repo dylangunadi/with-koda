@@ -21,13 +21,13 @@
 ### Option 2: Run SQL directly
 
 1. Open the Supabase Dashboard > SQL Editor.
-2. Paste the contents of `supabase/migrations/20260710_koda_mvp_schema.sql`.
+2. Paste the contents of `supabase/migrations/20260710000000_koda_mvp_schema.sql`.
 3. Click **Run**.
 
 ### Option 3: psql
 
 ```bash
-psql "$DATABASE_URL" -f supabase/migrations/20260710_koda_mvp_schema.sql
+psql "$DATABASE_URL" -f supabase/migrations/20260710000000_koda_mvp_schema.sql
 ```
 
 ## Notes
