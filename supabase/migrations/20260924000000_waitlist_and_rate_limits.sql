@@ -70,6 +70,12 @@ create index if not exists rate_limit_counters_window_idx
 alter table public.rate_limit_counters enable row level security;
 revoke all on public.rate_limit_counters from anon, authenticated;
 
+-- SECURITY DEFINER functions below pin search_path to '' and schema-qualify
+-- every object: with a non-empty path, Postgres still resolves relations in
+-- the caller's pg_temp schema first, so a caller could shadow a table.
+-- (Built-ins such as now() and random() live in pg_catalog, which is always
+-- searched.)
+
 -- Record one hit for p_key in the current window; true while within p_limit.
 -- Atomic under concurrency (single upsert). Keys must not contain raw
 -- personal data: callers hash IPs and email addresses.
@@ -80,7 +86,7 @@ create or replace function public.rate_limit_hit(
 ) returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   w timestamptz := to_timestamp(
@@ -88,15 +94,15 @@ declare
   );
   n integer;
 begin
-  insert into rate_limit_counters (key, window_start, hits)
+  insert into public.rate_limit_counters as c (key, window_start, hits)
   values (p_key, w, 1)
   on conflict (key, window_start)
-  do update set hits = rate_limit_counters.hits + 1
-  returning hits into n;
+  do update set hits = c.hits + 1
+  returning c.hits into n;
 
   -- Occasional cleanup of expired windows keeps the table small.
   if random() < 0.01 then
-    delete from rate_limit_counters where window_start < now() - interval '2 days';
+    delete from public.rate_limit_counters where window_start < now() - interval '2 days';
   end if;
 
   return n <= p_limit;
@@ -116,7 +122,7 @@ create function public.claim_brief_confirmation_email(p_email_hash text)
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   uid uuid := auth.uid();
@@ -127,12 +133,33 @@ begin
   if p_email_hash is null or p_email_hash !~ '^[0-9a-f]{64}$' then
     raise exception 'p_email_hash must be a hex HMAC-SHA256 digest';
   end if;
-  if not rate_limit_hit('brief_confirm:user:' || uid::text, 3600, 5) then
+  if not public.rate_limit_hit('brief_confirm:user:' || uid::text, 3600, 5) then
     return false;
   end if;
-  return rate_limit_hit('brief_confirm:email:' || p_email_hash, 86400, 3);
+  return public.rate_limit_hit('brief_confirm:email:' || p_email_hash, 86400, 3);
 end;
 $$;
 
 revoke execute on function public.claim_brief_confirmation_email(text) from public, anon;
 grant execute on function public.claim_brief_confirmation_email(text) to authenticated;
+
+-- Fail the migration if the grants are not what the app relies on (for
+-- example, platform default privileges re-granting EXECUTE to API roles).
+do $$
+begin
+  if has_function_privilege('anon', 'public.rate_limit_hit(text,integer,integer)', 'execute')
+     or has_function_privilege('authenticated', 'public.rate_limit_hit(text,integer,integer)', 'execute') then
+    raise exception 'rate_limit_hit must not be executable by anon or authenticated';
+  end if;
+  if has_function_privilege('anon', 'public.claim_brief_confirmation_email(text)', 'execute') then
+    raise exception 'claim_brief_confirmation_email must not be executable by anon';
+  end if;
+  if exists (
+    select 1 from pg_proc p
+    where p.oid in ('public.rate_limit_hit(text,integer,integer)'::regprocedure,
+                    'public.claim_brief_confirmation_email(text)'::regprocedure)
+      and not coalesce(p.proconfig, '{}') @> array['search_path=""']
+  ) then
+    raise exception 'SECURITY DEFINER functions must pin search_path to empty';
+  end if;
+end $$;
