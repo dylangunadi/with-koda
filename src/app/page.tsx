@@ -57,6 +57,7 @@ export default async function Home({
             controls
             autoPlay
             muted
+            loop
             playsInline
             preload="auto"
           />

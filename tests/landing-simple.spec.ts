@@ -8,6 +8,7 @@ test("simple landing shows the video and an email-only waitlist form", async ({ 
   // Browsers only allow autoplay for muted video.
   await expect(video).toHaveJSProperty("autoplay", true);
   await expect(video).toHaveJSProperty("muted", true);
+  await expect(video).toHaveJSProperty("loop", true);
   await expect(page.getByLabel("Email *")).toBeVisible();
   await expect(page.getByLabel("Name")).toHaveCount(0);
 });
