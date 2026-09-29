@@ -55,8 +55,10 @@ export default async function Home({
             src={VIDEO_URL}
             poster={POSTER_URL}
             controls
+            autoPlay
+            muted
             playsInline
-            preload="metadata"
+            preload="auto"
           />
         </div>
 

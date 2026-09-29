@@ -3,7 +3,11 @@ import { test, expect } from "@playwright/test";
 test("simple landing shows the video and an email-only waitlist form", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Your recruiting agent." })).toBeVisible();
-  await expect(page.getByTestId("landing-video")).toBeVisible();
+  const video = page.getByTestId("landing-video");
+  await expect(video).toBeVisible();
+  // Browsers only allow autoplay for muted video.
+  await expect(video).toHaveJSProperty("autoplay", true);
+  await expect(video).toHaveJSProperty("muted", true);
   await expect(page.getByLabel("Email *")).toBeVisible();
   await expect(page.getByLabel("Name")).toHaveCount(0);
 });
