@@ -4,9 +4,12 @@ import { KodaLogo } from "@/components/KodaLogo";
 import { WaitlistForm } from "@/components/WaitlistForm";
 
 // Simple holding page while the full site is in progress (full landing
-// lives at /full). The video comes from NEXT_PUBLIC_LANDING_VIDEO_URL, e.g.
-// a public Supabase Storage URL, falling back to public/koda.mp4.
-const VIDEO_URL = process.env.NEXT_PUBLIC_LANDING_VIDEO_URL || "/koda.mp4";
+// lives at /full). The video is served from the public KODA-V1-DEMO Supabase
+// Storage bucket; NEXT_PUBLIC_LANDING_VIDEO_URL overrides it.
+const DEFAULT_VIDEO_URL =
+  "https://fbjcohgaaeaojdgtyxbm.supabase.co/storage/v1/object/public/KODA-V1-DEMO/" +
+  encodeURIComponent("Adobe Express - Koda_Extension_Demo_Final.mp4");
+const VIDEO_URL = process.env.NEXT_PUBLIC_LANDING_VIDEO_URL || DEFAULT_VIDEO_URL;
 const POSTER_URL = process.env.NEXT_PUBLIC_LANDING_VIDEO_POSTER || undefined;
 
 export default async function Home({
