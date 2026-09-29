@@ -51,8 +51,8 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico (favicon)
      * - api/waitlist (public waitlist endpoint)
-     * - Static assets (svg, png, jpg, jpeg, gif, webp, ico)
+     * - Static assets (svg, png, jpg, jpeg, gif, webp, ico) and video (mp4, webm, mov)
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|api/waitlist|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|api/waitlist|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm|mov)$).*)',
   ],
 }
